@@ -157,16 +157,28 @@ class SpatialFeedForward(nn.Module):
 class MixTextFeatures(nn.Module):
     """Approximate the paper's Mix module using pooled image context."""
 
-    def __init__(self, channels: int, text_dim: int, num_text_tokens: int) -> None:
+    def __init__(
+        self,
+        channels: int,
+        text_dim: int,
+        num_text_tokens: int,
+        mix_hidden_dim: Optional[int] = None,
+    ) -> None:
         super().__init__()
         self.channels = channels
         self.num_text_tokens = num_text_tokens
-        token_dim = channels * num_text_tokens
+        self.mix_hidden_dim = mix_hidden_dim or min(text_dim, max(32, min(channels, 128)))
         self.text_mlp = nn.Sequential(
-            nn.Linear(text_dim, token_dim),
+            nn.Linear(text_dim, self.mix_hidden_dim),
             nn.GELU(),
-            nn.Linear(token_dim, token_dim),
+            nn.Linear(self.mix_hidden_dim, self.mix_hidden_dim),
         )
+        # A low-rank token generator keeps checkpoint size manageable while still
+        # producing token-specific text features for cross-attention.
+        self.token_embeddings = nn.Parameter(
+            torch.empty(num_text_tokens, self.mix_hidden_dim)
+        )
+        self.token_proj = nn.Linear(self.mix_hidden_dim, channels)
         self.image_context = nn.Sequential(
             conv3x3(channels, channels),
             nn.GELU(),
@@ -174,21 +186,28 @@ class MixTextFeatures(nn.Module):
             nn.AdaptiveAvgPool2d(1),
         )
         self.gate_mlp = nn.Sequential(
-            nn.Linear(channels, token_dim),
+            nn.Linear(channels, self.mix_hidden_dim),
             nn.GELU(),
-            nn.Linear(token_dim, token_dim),
+            nn.Linear(self.mix_hidden_dim, self.mix_hidden_dim),
         )
+        self.gate_embeddings = nn.Parameter(
+            torch.empty(num_text_tokens, self.mix_hidden_dim)
+        )
+        self.gate_proj = nn.Linear(self.mix_hidden_dim, channels)
         self.token_norm = nn.LayerNorm(channels)
+        nn.init.normal_(self.token_embeddings, std=0.02)
+        nn.init.normal_(self.gate_embeddings, std=0.02)
 
     def forward(self, image_features: Tensor, text_features: Tensor) -> Tensor:
-        batch_size = text_features.size(0)
-        local_text = self.text_mlp(text_features).view(
-            batch_size, self.num_text_tokens, self.channels
+        shared_text = self.text_mlp(text_features)
+        local_text = self.token_proj(
+            shared_text.unsqueeze(1) + self.token_embeddings.unsqueeze(0)
         )
         image_context = self.image_context(image_features).flatten(1)
         text_context = local_text.mean(dim=1)
-        gate = self.gate_mlp(image_context * text_context).view(
-            batch_size, self.num_text_tokens, self.channels
+        gate_context = self.gate_mlp(image_context * text_context)
+        gate = self.gate_proj(
+            gate_context.unsqueeze(1) + self.gate_embeddings.unsqueeze(0)
         )
         mixed = torch.sigmoid(gate) * local_text
         return self.token_norm(mixed)
@@ -201,13 +220,19 @@ class CrossAttention(nn.Module):
         text_dim: int,
         num_heads: int,
         num_text_tokens: int,
+        mix_hidden_dim: Optional[int] = None,
     ) -> None:
         super().__init__()
         if channels % num_heads != 0:
             raise ValueError("channels must be divisible by num_heads")
 
         self.query_proj = conv3x3(channels, channels)
-        self.text_adapter = MixTextFeatures(channels, text_dim, num_text_tokens)
+        self.text_adapter = MixTextFeatures(
+            channels,
+            text_dim,
+            num_text_tokens,
+            mix_hidden_dim=mix_hidden_dim,
+        )
         self.attn = nn.MultiheadAttention(
             embed_dim=channels,
             num_heads=num_heads,
@@ -233,6 +258,7 @@ class CATBlock(nn.Module):
         text_dim: int,
         num_heads: int = 8,
         num_text_tokens: int = 32,
+        mix_hidden_dim: Optional[int] = None,
     ) -> None:
         super().__init__()
         self.pre = conv3x3(channels, channels)
@@ -242,6 +268,7 @@ class CATBlock(nn.Module):
             text_dim=text_dim,
             num_heads=num_heads,
             num_text_tokens=num_text_tokens,
+            mix_hidden_dim=mix_hidden_dim,
         )
         self.norm2 = LayerNorm2d(channels)
         self.mlp = SpatialFeedForward(channels)
@@ -264,6 +291,7 @@ class CAtten(nn.Module):
         squeeze_channels: int = 192,
         num_heads: int = 8,
         num_text_tokens: int = 32,
+        mix_hidden_dim: Optional[int] = None,
     ) -> None:
         super().__init__()
         self.in_proj = conv1x1(channels, squeeze_channels)
@@ -273,6 +301,7 @@ class CAtten(nn.Module):
             text_dim=text_dim,
             num_heads=num_heads,
             num_text_tokens=num_text_tokens,
+            mix_hidden_dim=mix_hidden_dim,
         )
         self.post_rb = ResidualBlock(squeeze_channels, squeeze_channels)
         self.gate = nn.Sequential(conv1x1(squeeze_channels, squeeze_channels), nn.Sigmoid())
@@ -353,14 +382,33 @@ class AnalysisTransform(nn.Module):
         text_dim: int,
         num_heads: int,
         num_text_tokens: int,
+        mix_hidden_dim: Optional[int],
     ) -> None:
         super().__init__()
         self.down1 = ResidualBlockWithStride(3, hidden_channels, stride=2)
-        self.cat1 = CATBlock(hidden_channels, text_dim, num_heads, num_text_tokens)
+        self.cat1 = CATBlock(
+            hidden_channels,
+            text_dim,
+            num_heads,
+            num_text_tokens,
+            mix_hidden_dim=mix_hidden_dim,
+        )
         self.down2 = ResidualBlockWithStride(hidden_channels, hidden_channels, stride=2)
-        self.cat2 = CATBlock(hidden_channels, text_dim, num_heads, num_text_tokens)
+        self.cat2 = CATBlock(
+            hidden_channels,
+            text_dim,
+            num_heads,
+            num_text_tokens,
+            mix_hidden_dim=mix_hidden_dim,
+        )
         self.down3 = ResidualBlockWithStride(hidden_channels, hidden_channels, stride=2)
-        self.cat3 = CATBlock(hidden_channels, text_dim, num_heads, num_text_tokens)
+        self.cat3 = CATBlock(
+            hidden_channels,
+            text_dim,
+            num_heads,
+            num_text_tokens,
+            mix_hidden_dim=mix_hidden_dim,
+        )
         self.out_conv = conv3x3(hidden_channels, latent_channels, stride=2)
 
     def forward(self, x: Tensor, text_features: Tensor) -> Tensor:
@@ -378,14 +426,33 @@ class SynthesisTransform(nn.Module):
         text_dim: int,
         num_heads: int,
         num_text_tokens: int,
+        mix_hidden_dim: Optional[int],
     ) -> None:
         super().__init__()
         self.up1 = ResidualBlockUpsample(latent_channels, hidden_channels, 2)
-        self.cat1 = CATBlock(hidden_channels, text_dim, num_heads, num_text_tokens)
+        self.cat1 = CATBlock(
+            hidden_channels,
+            text_dim,
+            num_heads,
+            num_text_tokens,
+            mix_hidden_dim=mix_hidden_dim,
+        )
         self.up2 = ResidualBlockUpsample(hidden_channels, hidden_channels, 2)
-        self.cat2 = CATBlock(hidden_channels, text_dim, num_heads, num_text_tokens)
+        self.cat2 = CATBlock(
+            hidden_channels,
+            text_dim,
+            num_heads,
+            num_text_tokens,
+            mix_hidden_dim=mix_hidden_dim,
+        )
         self.up3 = ResidualBlockUpsample(hidden_channels, hidden_channels, 2)
-        self.cat3 = CATBlock(hidden_channels, text_dim, num_heads, num_text_tokens)
+        self.cat3 = CATBlock(
+            hidden_channels,
+            text_dim,
+            num_heads,
+            num_text_tokens,
+            mix_hidden_dim=mix_hidden_dim,
+        )
         self.out_conv = subpel_conv3x3(hidden_channels, 3, 2)
 
     def forward(self, x: Tensor, text_features: Tensor) -> Tensor:
@@ -403,10 +470,17 @@ class HyperAnalysis(nn.Module):
         text_dim: int,
         num_heads: int,
         num_text_tokens: int,
+        mix_hidden_dim: Optional[int],
     ) -> None:
         super().__init__()
         self.down = ResidualBlockWithStride(latent_channels, hyper_channels, stride=2)
-        self.cat = CATBlock(hyper_channels, text_dim, num_heads, num_text_tokens)
+        self.cat = CATBlock(
+            hyper_channels,
+            text_dim,
+            num_heads,
+            num_text_tokens,
+            mix_hidden_dim=mix_hidden_dim,
+        )
         self.out_conv = conv3x3(hyper_channels, hyper_channels, stride=2)
 
     def forward(self, x: Tensor, text_features: Tensor) -> Tensor:
@@ -423,10 +497,17 @@ class HyperSynthesis(nn.Module):
         text_dim: int,
         num_heads: int,
         num_text_tokens: int,
+        mix_hidden_dim: Optional[int],
     ) -> None:
         super().__init__()
         self.up = ResidualBlockUpsample(hyper_channels, hyper_channels, 2)
-        self.cat = CATBlock(hyper_channels, text_dim, num_heads, num_text_tokens)
+        self.cat = CATBlock(
+            hyper_channels,
+            text_dim,
+            num_heads,
+            num_text_tokens,
+            mix_hidden_dim=mix_hidden_dim,
+        )
         self.out_conv = subpel_conv3x3(hyper_channels, latent_channels * 2, 2)
 
     def forward(self, x: Tensor, text_features: Tensor) -> tuple[Tensor, Tensor]:
@@ -447,6 +528,7 @@ class CATC(CompressionModel):
         num_heads: int = 8,
         num_text_tokens: int = 32,
         squeeze_channels: int = 192,
+        mix_hidden_dim: Optional[int] = None,
         **kwargs,
     ) -> None:
         super().__init__(entropy_bottleneck_channels=hyper_channels, **kwargs)
@@ -459,6 +541,7 @@ class CATC(CompressionModel):
         self.text_dim = text_dim
         self.num_slices = num_slices
         self.slice_channels = latent_channels // num_slices
+        self.mix_hidden_dim = mix_hidden_dim
 
         self.g_a = AnalysisTransform(
             hidden_channels=hidden_channels,
@@ -466,6 +549,7 @@ class CATC(CompressionModel):
             text_dim=text_dim,
             num_heads=num_heads,
             num_text_tokens=num_text_tokens,
+            mix_hidden_dim=mix_hidden_dim,
         )
         self.g_s = SynthesisTransform(
             hidden_channels=hidden_channels,
@@ -473,6 +557,7 @@ class CATC(CompressionModel):
             text_dim=text_dim,
             num_heads=num_heads,
             num_text_tokens=num_text_tokens,
+            mix_hidden_dim=mix_hidden_dim,
         )
         self.h_a = HyperAnalysis(
             latent_channels=latent_channels,
@@ -480,6 +565,7 @@ class CATC(CompressionModel):
             text_dim=text_dim,
             num_heads=num_heads,
             num_text_tokens=num_text_tokens,
+            mix_hidden_dim=mix_hidden_dim,
         )
         self.h_s = HyperSynthesis(
             latent_channels=latent_channels,
@@ -487,6 +573,7 @@ class CATC(CompressionModel):
             text_dim=text_dim,
             num_heads=num_heads,
             num_text_tokens=num_text_tokens,
+            mix_hidden_dim=mix_hidden_dim,
         )
 
         self.mean_gru = ConvGRUCell(self.slice_channels, latent_channels)
@@ -497,6 +584,7 @@ class CATC(CompressionModel):
             squeeze_channels=squeeze_channels,
             num_heads=num_heads,
             num_text_tokens=num_text_tokens,
+            mix_hidden_dim=mix_hidden_dim,
         )
         self.scale_catten = CAtten(
             latent_channels,
@@ -504,6 +592,7 @@ class CATC(CompressionModel):
             squeeze_channels=squeeze_channels,
             num_heads=num_heads,
             num_text_tokens=num_text_tokens,
+            mix_hidden_dim=mix_hidden_dim,
         )
         self.mean_parameters = ParametersNet(latent_channels, self.slice_channels)
         self.scale_parameters = ParametersNet(latent_channels, self.slice_channels)

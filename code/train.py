@@ -109,6 +109,10 @@ class CustomDataParallel(nn.DataParallel):
             return getattr(self.module, key)
 
 
+def unwrap_model(model: nn.Module) -> nn.Module:
+    return model.module if isinstance(model, nn.DataParallel) else model
+
+
 def configure_optimizers(net: nn.Module, args) -> tuple[optim.Optimizer, optim.Optimizer]:
     params = {
         name
@@ -293,10 +297,46 @@ def evaluate(
     return loss_meter.avg
 
 
-def save_checkpoint(state: dict, epoch: int, save_dir: Path) -> None:
+def build_checkpoint_payload(
+    model: nn.Module,
+    epoch: int,
+    loss: float,
+    best_loss: float,
+    args,
+    include_training_state: bool,
+    optimizer: optim.Optimizer,
+    aux_optimizer: optim.Optimizer,
+    scheduler: optim.lr_scheduler.LRScheduler,
+) -> dict:
+    checkpoint = {
+        "epoch": epoch,
+        "state_dict": unwrap_model(model).state_dict(),
+        "loss": loss,
+        "best_loss": best_loss,
+        "args": vars(args),
+        "checkpoint_mode": "full" if include_training_state else "weights_only",
+    }
+    if include_training_state:
+        checkpoint.update(
+            {
+                "optimizer": optimizer.state_dict(),
+                "aux_optimizer": aux_optimizer.state_dict(),
+                "lr_scheduler": scheduler.state_dict(),
+            }
+        )
+    return checkpoint
+
+
+def save_checkpoint(
+    state: dict,
+    epoch: int,
+    save_dir: Path,
+    save_epoch_checkpoints: bool = False,
+) -> None:
     save_dir.mkdir(parents=True, exist_ok=True)
-    torch.save(state, save_dir / f"{epoch}.pth.tar")
     torch.save(state, save_dir / "checkpoint_latest.pth.tar")
+    if save_epoch_checkpoints:
+        torch.save(state, save_dir / f"{epoch}.pth.tar")
 
 
 def parse_args(argv):
@@ -331,6 +371,22 @@ def parse_args(argv):
     parser.add_argument("--text-dim", default=512, type=int)
     parser.add_argument("--num-slices", default=5, type=int)
     parser.add_argument("--save", action="store_true", default=True)
+    parser.add_argument(
+        "--save-training-state",
+        action="store_true",
+        help=(
+            "Include optimizer, auxiliary optimizer, and scheduler state in checkpoints. "
+            "This enables exact training resume but makes checkpoints much larger."
+        ),
+    )
+    parser.add_argument(
+        "--save-epoch-checkpoints",
+        action="store_true",
+        help=(
+            "Keep per-epoch checkpoint snapshots in addition to checkpoint_latest.pth.tar. "
+            "By default only the latest checkpoint is retained."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -382,10 +438,16 @@ def main(argv) -> None:
         model.load_state_dict(state_dict)
         if "optimizer" in checkpoint:
             optimizer.load_state_dict(checkpoint["optimizer"])
+        else:
+            print("Checkpoint does not include optimizer state; using a fresh optimizer.")
         if "aux_optimizer" in checkpoint:
             aux_optimizer.load_state_dict(checkpoint["aux_optimizer"])
+        else:
+            print("Checkpoint does not include auxiliary optimizer state; using a fresh one.")
         if "lr_scheduler" in checkpoint:
             scheduler.load_state_dict(checkpoint["lr_scheduler"])
+        else:
+            print("Checkpoint does not include scheduler state; using a fresh scheduler.")
         start_epoch = int(checkpoint.get("epoch", -1)) + 1
 
     best_loss = float("inf")
@@ -411,19 +473,22 @@ def main(argv) -> None:
 
         best_loss = min(best_loss, val_loss)
         if args.save:
+            checkpoint = build_checkpoint_payload(
+                model=model,
+                epoch=epoch,
+                loss=val_loss,
+                best_loss=best_loss,
+                args=args,
+                include_training_state=args.save_training_state,
+                optimizer=optimizer,
+                aux_optimizer=aux_optimizer,
+                scheduler=scheduler,
+            )
             save_checkpoint(
-                {
-                    "epoch": epoch,
-                    "state_dict": model.state_dict(),
-                    "loss": val_loss,
-                    "best_loss": best_loss,
-                    "optimizer": optimizer.state_dict(),
-                    "aux_optimizer": aux_optimizer.state_dict(),
-                    "lr_scheduler": scheduler.state_dict(),
-                    "args": vars(args),
-                },
+                checkpoint,
                 epoch,
                 save_dir,
+                save_epoch_checkpoints=args.save_epoch_checkpoints,
             )
 
     if writer is not None:
