@@ -1,0 +1,8 @@
+torch
+torchvision
+compressai>=1.2
+pytorch-msssim
+Pillow
+numpy
+tensorboard
+git+https://github.com/openai/CLIP.git
