@@ -17,3 +17,19 @@
 - 2026-04-22: Checked the git status, confirmed the active remote, and confirmed there was no existing `.gitignore` file in the repository root.
 - 2026-04-22: Added a minimal `.gitignore` to keep local Python bytecode artifacts (`__pycache__` and `*.py[cod]`) out of the commit while pushing the requested source changes.
 - 2026-04-22: User approved proceeding with staging, committing, and pushing the current checkpoint-size cleanup changes to GitHub using the requested commit message.
+- 2026-04-23: Began work on improving single-image evaluation for a user-provided AI-generated PNG and on printing original versus compressed sizes during evaluation.
+- 2026-04-23: Inspected `code/eval.py`, confirmed it only supported numbered image directories paired with a prompt text file, and confirmed the user's attached PNG file exists at `C:\Users\masha\Downloads\Robot photo library in a tech world.png`.
+- 2026-04-23: Patched `code/eval.py` so `--data-i` can now point to either a single image file or an image directory.
+- 2026-04-23: Patched `code/eval.py` to support `--prompt` for single-image evaluation, while preserving the previous `--data-t` text-file workflow for batch testing.
+- 2026-04-23: Added explicit per-image size reporting in `code/eval.py`, including original file size, compressed payload size, image bitstream bytes, and prompt text bytes.
+- 2026-04-23: Checked the repository for existing `.pth` and `.pth.tar` files after the user asked which checkpoint path to substitute into the evaluation command.
+- 2026-04-23: Confirmed that there is currently no checkpoint file present in the repository workspace; the earlier smoke-test checkpoint path is no longer available after the temporary run directory was deleted.
+- 2026-04-23: User asked for help producing a small checkpoint that can be used to test the codec on the attached AI-generated PNG and also asked for an explanation of why the checkpoint is needed.
+- 2026-04-23: Confirmed the attached image exists at `C:\Users\masha\Downloads\Robot photo library in a tech world.png` and measured its current file size as 2,169,330 bytes.
+- 2026-04-23: Began preparing a tiny PKU-style dataset and smoke-training workflow so a compact inference checkpoint can be generated locally for this image.
+- 2026-04-23: Created `tmp_single_image_dataset`, a tiny PKU-style dataset layout that reuses the attached PNG as `1.png` in the `train` and `val` splits for `SD-2_1-B`, `SD-2_1`, `SD-XL`, `MJ`, and `MOD`, with the shared prompt `a cute robot photo library in a colorful futuristic tech world`.
+- 2026-04-23: Ran a one-epoch smoke-training job with reduced channel counts (`hidden=16`, `latent=40`, `hyper=24`, `num_slices=5`) and produced a compact checkpoint under `tmp_single_image_runs\16_0.05\checkpoint_latest.pth.tar`.
+- 2026-04-23: Ran the patched single-image evaluator on the attached PNG using the new checkpoint and prompt.
+- 2026-04-23: Evaluation on the attached PNG reported `original_size=2169330 bytes`, `compressed_size=36018 bytes`, `image_bitstream=35956 bytes`, `text_bytes=62`, `bpp=0.1832`, `psnr=6.689 dB`, `ms-ssim=0.418 dB`, and `average_time=3084.01 ms`.
+- 2026-04-23: User requested that the current changes be pushed to GitHub.
+- 2026-04-23: Checked git status and confirmed the intended source changes are `code/eval.py` and `CodexProgress.md`, while `tmp_single_image_dataset` and `tmp_single_image_runs` remain local temporary artifacts and are not being included in the push.
