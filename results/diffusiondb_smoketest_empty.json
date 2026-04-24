@@ -1,0 +1,40 @@
+[
+  {
+    "prompt_case": "empty",
+    "local_id": 1,
+    "image_name": "0001.png",
+    "image_path": "C:\\Users\\masha\\OneDrive\\Documents\\Playground\\PKU-AIGI-500K\\tmp_diffusiondb_smoketest\\data\\images\\0001.png",
+    "source_image_name": "ee558f4b-5f42-445b-b100-07cc14aad514.png",
+    "part_id": 1,
+    "prompt": "",
+    "original_prompt": "predator from the movie predator doing entertainment for kids at a birthday party ",
+    "original_image_size": 448127,
+    "original_text_size": 82,
+    "prompt_text_size": 0,
+    "image_bitstream": 6200,
+    "compressed_size": 6200,
+    "bpp": 0.189208984375,
+    "psnr_db": 5.525372202542336,
+    "ms_ssim_db": 0.7361756243737745,
+    "elapsed_ms": 668.6785221099854
+  },
+  {
+    "prompt_case": "empty",
+    "local_id": 4,
+    "image_name": "0004.png",
+    "image_path": "C:\\Users\\masha\\OneDrive\\Documents\\Playground\\PKU-AIGI-500K\\tmp_diffusiondb_smoketest\\data\\images\\0004.png",
+    "source_image_name": "a15d5448-57b9-4717-9c92-31f87681bdc2.png",
+    "part_id": 1,
+    "prompt": "",
+    "original_prompt": "of beautiful zoelea ixchel no ra, dancing eagle woman, smiling, goddess, mayan, 1 1 1 1, engulfed in funkadelic aura, surreal illustration, alphonse mucha, rhads, ross tran, artstation, artgerm, octane render, 1 6 k ",
+    "original_image_size": 865332,
+    "original_text_size": 216,
+    "prompt_text_size": 0,
+    "image_bitstream": 10068,
+    "compressed_size": 10068,
+    "bpp": 0.18907752403846154,
+    "psnr_db": 4.811360957963016,
+    "ms_ssim_db": 0.6787699105869502,
+    "elapsed_ms": 1070.8951950073242
+  }
+]

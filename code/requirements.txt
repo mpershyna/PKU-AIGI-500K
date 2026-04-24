@@ -5,4 +5,5 @@ pytorch-msssim
 Pillow
 numpy
 tensorboard
+remotezip
 git+https://github.com/openai/CLIP.git

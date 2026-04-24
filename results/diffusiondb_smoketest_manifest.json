@@ -1,0 +1,18 @@
+{
+  "experiment_name": "diffusiondb_smoketest",
+  "checkpoint_path": "C:\\Users\\masha\\OneDrive\\Documents\\Playground\\PKU-AIGI-500K\\tmp_diffusiondb_smoketest\\checkpoints\\16_0.05\\checkpoint_latest.pth.tar",
+  "dataset_repo": "poloclub/diffusiondb",
+  "diffusiondb_subset": "2m",
+  "part_ids": [
+    1
+  ],
+  "sample_count": 4,
+  "train_count": 2,
+  "eval_count": 2,
+  "cases": [
+    "correct",
+    "empty",
+    "shuffled_words",
+    "swapped_prompts"
+  ]
+}

@@ -55,6 +55,27 @@ Example evaluation command:
 python code/eval.py --checkpoint /path/to/checkpoint.pth.tar --data-i /path/to/images --data-t /path/to/prompts.txt --cuda
 ```
 
+## DiffusionDB Prompt Ablation
+For a small local prompt-ablation experiment, you can sample a limited
+number of image/prompt pairs directly from the official DiffusionDB remote
+shard zips, train one small checkpoint on correct pairs, and then evaluate
+the same checkpoint under multiple prompt conditions (`correct`, `empty`,
+`shuffled_words`, and `swapped_prompts`) with:
+
+```bash
+python code/run_diffusiondb_prompt_ablation.py --cuda
+```
+
+By default this script:
+
+- downloads 50 DiffusionDB pairs into `diffusiondb_prompt_ablation/data`
+- uses 40 pairs for training and 10 held-out pairs for evaluation
+- trains a small local checkpoint under `diffusiondb_prompt_ablation/checkpoints`
+- writes JSON arrays for each prompt case into `results/`
+
+The main knobs for scaling later are `--sample-count`, `--part-ids`,
+`--epochs`, and the channel-size arguments.
+
 
 # Citation
 :smiley:If you find our repository useful for your research, please consider citing our paper:
