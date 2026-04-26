@@ -76,6 +76,17 @@ By default this script:
 The main knobs for scaling later are `--sample-count`, `--part-ids`,
 `--epochs`, and the channel-size arguments.
 
+To plot the compression ratio `compressed_size / initial_size` by prompt case,
+run:
+
+```bash
+python code/plot_prompt_ablation_results.py
+```
+
+Here `initial_size` is the original image size plus the original prompt-text
+size. The script reads the JSON arrays in `results/` and writes a PNG such as
+`results/diffusiondb_prompt_ablation_compression_ratio_by_case.png`.
+
 
 # Citation
 :smiley:If you find our repository useful for your research, please consider citing our paper:

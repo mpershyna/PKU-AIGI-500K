@@ -1,0 +1,112 @@
+{
+  "dataset_repo": "poloclub/diffusiondb",
+  "diffusiondb_subset": "2m",
+  "part_ids": [
+    1
+  ],
+  "sample_count": 4,
+  "train_count": 2,
+  "eval_count": 2,
+  "seed": 42,
+  "records": [
+    {
+      "local_id": 1,
+      "image_path": "images/0001.png",
+      "image_name": "0001.png",
+      "source_image_name": "ee558f4b-5f42-445b-b100-07cc14aad514.png",
+      "prompt": "predator from the movie predator doing entertainment for kids at a birthday party ",
+      "part_id": 1,
+      "source_seed": null,
+      "width": 512,
+      "height": 512
+    },
+    {
+      "local_id": 2,
+      "image_path": "images/0002.png",
+      "image_name": "0002.png",
+      "source_image_name": "47ca4682-dae2-42c7-9f9b-2d3eb387755b.png",
+      "prompt": "symmetry!! a tiny cute chinese spring festival oriental tale mascot eagle - phoenix dragon toys, magic, intricate, smooth line, light dust, mysterious dark background, warm top light, hd, 8 k, smooth \uff0c sharp high quality artwork in style of greg rutkowski, concept art, blizzard warcraft artwork, bright colors ",
+      "part_id": 1,
+      "source_seed": null,
+      "width": 640,
+      "height": 640
+    },
+    {
+      "local_id": 3,
+      "image_path": "images/0003.png",
+      "image_name": "0003.png",
+      "source_image_name": "6a50015c-2ec7-46d7-aa99-188897874a37.png",
+      "prompt": "cute soul ghost in infinity mirror room by yayoi kusama, anime soulsand, warm lighting, highly detailed, artstation ",
+      "part_id": 1,
+      "source_seed": null,
+      "width": 640,
+      "height": 768
+    },
+    {
+      "local_id": 4,
+      "image_path": "images/0004.png",
+      "image_name": "0004.png",
+      "source_image_name": "a15d5448-57b9-4717-9c92-31f87681bdc2.png",
+      "prompt": "of beautiful zoelea ixchel no ra, dancing eagle woman, smiling, goddess, mayan, 1 1 1 1, engulfed in funkadelic aura, surreal illustration, alphonse mucha, rhads, ross tran, artstation, artgerm, octane render, 1 6 k ",
+      "part_id": 1,
+      "source_seed": null,
+      "width": 512,
+      "height": 832
+    }
+  ],
+  "train_records": [
+    {
+      "local_id": 2,
+      "image_path": "images/0002.png",
+      "image_name": "0002.png",
+      "source_image_name": "47ca4682-dae2-42c7-9f9b-2d3eb387755b.png",
+      "prompt": "symmetry!! a tiny cute chinese spring festival oriental tale mascot eagle - phoenix dragon toys, magic, intricate, smooth line, light dust, mysterious dark background, warm top light, hd, 8 k, smooth \uff0c sharp high quality artwork in style of greg rutkowski, concept art, blizzard warcraft artwork, bright colors ",
+      "part_id": 1,
+      "source_seed": null,
+      "width": 640,
+      "height": 640
+    },
+    {
+      "local_id": 3,
+      "image_path": "images/0003.png",
+      "image_name": "0003.png",
+      "source_image_name": "6a50015c-2ec7-46d7-aa99-188897874a37.png",
+      "prompt": "cute soul ghost in infinity mirror room by yayoi kusama, anime soulsand, warm lighting, highly detailed, artstation ",
+      "part_id": 1,
+      "source_seed": null,
+      "width": 640,
+      "height": 768
+    }
+  ],
+  "eval_records": [
+    {
+      "local_id": 1,
+      "image_path": "images/0001.png",
+      "image_name": "0001.png",
+      "source_image_name": "ee558f4b-5f42-445b-b100-07cc14aad514.png",
+      "prompt": "predator from the movie predator doing entertainment for kids at a birthday party ",
+      "part_id": 1,
+      "source_seed": null,
+      "width": 512,
+      "height": 512
+    },
+    {
+      "local_id": 4,
+      "image_path": "images/0004.png",
+      "image_name": "0004.png",
+      "source_image_name": "a15d5448-57b9-4717-9c92-31f87681bdc2.png",
+      "prompt": "of beautiful zoelea ixchel no ra, dancing eagle woman, smiling, goddess, mayan, 1 1 1 1, engulfed in funkadelic aura, surreal illustration, alphonse mucha, rhads, ross tran, artstation, artgerm, octane render, 1 6 k ",
+      "part_id": 1,
+      "source_seed": null,
+      "width": 512,
+      "height": 832
+    }
+  ],
+  "shards": [
+    {
+      "part_id": 1,
+      "zip_url": "https://huggingface.co/datasets/poloclub/diffusiondb/resolve/main/images/part-000001.zip",
+      "sample_count": 4
+    }
+  ]
+}

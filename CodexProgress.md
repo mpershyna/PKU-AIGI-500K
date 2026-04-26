@@ -56,3 +56,16 @@
 - 2026-04-24: Ran a 4-pair end-to-end smoke test of `code/run_diffusiondb_prompt_ablation.py` on CPU using `part-000001`, producing a small checkpoint and JSON arrays under `results` for all four prompt cases.
 - 2026-04-24: Ran the full local 50-pair DiffusionDB prompt-ablation experiment on CPU using the `2m` subset and shard `part-001310`, with 40 pairs for training and 10 held-out pairs for evaluation.
 - 2026-04-24: The full 50-pair run saved a weights-only checkpoint at `diffusiondb_prompt_ablation\checkpoints\16_0.05\checkpoint_latest.pth.tar` (41,453,039 bytes) and wrote per-case JSON arrays plus summary and manifest files under `results`.
+- 2026-04-24: User asked for code to plot the resulting `image_bitstream` and `compressed_size` values by prompt case from the saved JSON arrays.
+- 2026-04-24: Confirmed that `matplotlib` is already available in the local Python environment and inspected the combined `results\diffusiondb_prompt_ablation_all_cases.json` structure before adding the plotting utility.
+- 2026-04-24: Added `code/plot_prompt_ablation_results.py`, which reads the prompt-ablation JSON arrays and produces a two-panel PNG showing `image_bitstream` and `compressed_size` distributions by prompt case with boxplots, per-image jittered points, and mean markers.
+- 2026-04-24: Added `matplotlib` to `code/requirements.txt` and documented the plotting command in `README.md`.
+- 2026-04-24: Syntax-checked `code/plot_prompt_ablation_results.py` and ran it successfully on the current DiffusionDB experiment outputs, generating `results\diffusiondb_prompt_ablation_bitstream_size_by_case.png`.
+- 2026-04-26: User asked to change the plotting utility so it uses the ratio `compressed_size / initial_size` by prompt case instead of plotting raw compressed size.
+- 2026-04-26: Updated `code/plot_prompt_ablation_results.py` so the second panel now plots `compressed_size / initial_size`, where `initial_size` is defined as `original_image_size + original_text_size`, and formats that axis as a percentage.
+- 2026-04-26: Updated `README.md` so the plotting documentation matches the new ratio-based figure and output filename.
+- 2026-04-26: User asked to simplify the plotting utility further so it only plots the compression-ratio panel and drops the separate image-bitstream panel.
+- 2026-04-26: Updated `code/plot_prompt_ablation_results.py` to generate a single-panel compression-ratio figure and changed the default output filename to `*_compression_ratio_by_case.png`.
+- 2026-04-26: Updated `README.md` so the plotting instructions describe the single-panel compression-ratio output.
+- 2026-04-26: User asked whether the observed DiffusionDB compression ratios are reasonable and how much compression the original PKU-AIGI-500K paper reports.
+- 2026-04-26: Inspected the current `results\diffusiondb_prompt_ablation_summary.json` metrics and rendered the results page from the attached paper PDF to read the reported Table IV and Table V BD-rate results and Fig. 13 bitrate ranges.
