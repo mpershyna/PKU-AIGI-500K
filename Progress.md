@@ -1,0 +1,36 @@
+# Progress Log
+
+- 2026-05-04: User asked for commands to download the remaining four PKU-AIGI-500K subsets without starting the download process.
+- 2026-05-04: Confirmed the repo root currently had `CodexProgress.md` but no `Progress.md`, so this progress log was created.
+- 2026-05-04: Queried the Hugging Face dataset metadata API for `Forerunner/PKU-AIGI-500K` to verify current archive filenames and sizes without downloading dataset payloads.
+- 2026-05-04: Confirmed the remaining subset archive names are `SD-2_1-B-part1.zip`, `SD-2_1-B-part2.zip`, `SD-2_1-B.txt`, `SD-XL.z01` through `SD-XL.z15`, `SD-XL.zip`, `MJ.zip`, `MJ.txt`, `MOD.zip`, and `MOD.txt`; also noted the separate `vaild.zip` archive.
+- 2026-05-04: Prepared resumable `wget -c` commands for the remaining subsets, but did not run any download commands.
+- 2026-05-04: User asked about the purpose of `vaild.zip`.
+- 2026-05-04: Searched the local training code for validation split handling and confirmed `code/train.py` expects each subset to have a `val` image directory plus a validation prompt file named `vaild.txt`, `valid.txt`, or `val.txt`.
+- 2026-05-04: Made a metadata-only Hugging Face API check while answering the validation archive question; did not download `vaild.zip` or any other dataset payload.
+- 2026-05-04: User asked whether `vaild.zip` contains both validation and test sets.
+- 2026-05-04: Performed a header-only check of the Hugging Face `vaild.zip` URL and fetched only the final 200 KB byte range of the archive to inspect its central directory without downloading the full 121 MB file.
+- 2026-05-04: Parsed the `vaild.zip` central directory and confirmed it contains only a top-level `vaild/` tree with validation images and prompt text files: 40 SD21B images, 40 SD21 images, 20 SDXL images, 10 MJ images, and 5 MOD images. No `test/` entries were present.
+- 2026-05-04: User asked to amend the training code for full PKU-AIGI-500K CATC training while staying as close as possible to the paper setup, using validation during training if appropriate, and not starting training.
+- 2026-05-04: Confirmed the current `data/` directory contains the five training archive groups plus `vaild.zip`, but only as archives/text files; no extracted image directories were observed.
+- 2026-05-04: Briefly started a local archive-layout inspection for `SD21.zip` and stopped it after noticing it would read too much archive payload; no dataset extraction or training was started.
+- 2026-05-04: Patched `code/train.py` so dataset discovery matches the official archive names (`SD21B`, `SD21`, `SDXL`, `MJ`, `MOD`) and the extracted `vaild/` validation layout instead of requiring only hard-coded `train/` and `val/` directories.
+- 2026-05-04: Added `--datasets`, `--validation-root`, and `--no-validation` options to `code/train.py` so full-data training uses all five training subsets by default while validation can be read from the separate extracted validation archive.
+- 2026-05-04: Added a paper-style step training mode to `code/train.py` with `--training-mode step`, default 2,000,000 optimizer updates, step learning-rate drops at 1,600,000 and 1,850,000 updates, periodic validation, and periodic checkpoint saves.
+- 2026-05-04: Updated checkpoint payloads in `code/train.py` to include `global_step` while preserving the existing weights-only default and optional `--save-training-state` behavior.
+- 2026-05-04: Syntax-checked the patched `code/train.py` with an AST parse and confirmed it parses successfully.
+- 2026-05-04: Checked local extraction tooling and confirmed neither `7z`/`7zz` nor `unzip` is currently installed; Ubuntu 24.04 package metadata shows the `7zip` package is available.
+- 2026-05-04: Checked available disk space for `data/` and found about 1.3 TB free on the filesystem before extraction.
+- 2026-05-04: Inspected `code/eval.py` to confirm it loads weights-only checkpoints via the same default CATC channel settings used by the training command.
+- 2026-05-04: Prepared extraction and training commands for the user, but did not extract archives or start training.
+- 2026-05-04: User reported they do not have the sudo password and asked for a no-sudo way to install 7zip or use a different extraction tool.
+- 2026-05-04: Added `code/extract_pku_archives.py`, a pure-Python extractor that uses the standard library to read normal ZIP archives and PKU split ZIP archives (`.z01`, `.z02`, ..., `.zip`) without installing system packages.
+- 2026-05-04: Syntax-checked `code/extract_pku_archives.py` with an AST parse.
+- 2026-05-04: Dry-ran the extractor against `vaild.zip` and confirmed it reads 126 members / 120 files without extracting.
+- 2026-05-04: Updated the extractor to parse split Zip64 end records directly after Python's stock `zipfile` parser rejected multi-disk Zip64 archives.
+- 2026-05-04: Fixed split part discovery for `.z01`-style suffixes and dry-ran `SD21.zip`, confirming the extractor reads 203,243 members / 203,242 files without extracting.
+- 2026-05-04: Dry-ran all PKU archive groups with the no-sudo extractor and confirmed metadata for SD21, SD21B part1, SD21B part2, SDXL, MJ, MOD, and `vaild.zip` without extracting image data.
+- 2026-05-04: User asked whether CLIP and its PyTorch dependency can be installed with pip instead of conda.
+- 2026-05-04: Checked the local environment and confirmed Python 3.12.3, pip 24.0, and an NVIDIA H100 with driver-reported CUDA 12.6 are available.
+- 2026-05-04: Confirmed `python3 -m venv` is available, so dependencies can be installed in a no-sudo virtual environment instead of the system Python.
+- 2026-05-04: Confirmed `code/requirements.txt` already includes `git+https://github.com/openai/CLIP.git` along with PyTorch-related dependencies.

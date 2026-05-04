@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 
 from model.cm_gru import CM_GRU
-from model.dataset import MyDataset
+from model.dataset import IMAGE_EXTENSIONS, MyDataset
 
 try:
     from torch.utils.tensorboard import SummaryWriter
@@ -43,12 +43,44 @@ TRAIN_SCHEDULE = [
 ]
 
 DATASET_LAYOUT = {
-    "SD21B": {"folder": "SD-2_1-B", "eval_size": (512, 512)},
-    "SD21": {"folder": "SD-2_1", "eval_size": (768, 768)},
-    "SDXL": {"folder": "SD-XL", "eval_size": (1024, 1024)},
-    "MJ": {"folder": "MJ", "eval_size": (1024, 1024)},
-    "MOD": {"folder": "MOD", "eval_size": (1408, 640)},
+    "SD21B": {
+        "folder": "SD-2_1-B",
+        "archive_folder": "SD21B",
+        "eval_size": (512, 512),
+        "train_text": ["train.txt", "SD-2_1-B.txt", "SD21B.txt"],
+        "val_text": ["vaild.txt", "valid.txt", "val.txt", "SD-2_1-B.txt", "SD21B.txt"],
+    },
+    "SD21": {
+        "folder": "SD-2_1",
+        "archive_folder": "SD21",
+        "eval_size": (768, 768),
+        "train_text": ["train.txt", "SD21.txt", "SD-2_1.txt"],
+        "val_text": ["vaild.txt", "valid.txt", "val.txt", "SD-2_1.txt", "SD21.txt"],
+    },
+    "SDXL": {
+        "folder": "SD-XL",
+        "archive_folder": "SDXL",
+        "eval_size": (1024, 1024),
+        "train_text": ["train.txt", "SD-XL.txt", "SDXL.txt"],
+        "val_text": ["vaild.txt", "valid.txt", "val.txt", "SD-XL.txt", "SDXL.txt"],
+    },
+    "MJ": {
+        "folder": "MJ",
+        "archive_folder": "MJ",
+        "eval_size": (1024, 1024),
+        "train_text": ["train.txt", "MJ.txt"],
+        "val_text": ["vaild.txt", "valid.txt", "val.txt", "MJ.txt"],
+    },
+    "MOD": {
+        "folder": "MOD",
+        "archive_folder": "MOD",
+        "eval_size": (1408, 640),
+        "train_text": ["train.txt", "MOD.txt"],
+        "val_text": ["vaild.txt", "valid.txt", "val.txt", "MOD.txt"],
+    },
 }
+
+DEFAULT_STEP_MILESTONES = [1_600_000, 1_850_000]
 
 
 def compute_msssim(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
@@ -139,18 +171,93 @@ def encode_text_batch(text_model, prompts, device: torch.device) -> torch.Tensor
         return text_model.encode_text(tokens).float()
 
 
-def resolve_text_file(split_root: Path, split: str) -> Path:
-    candidates = {
-        "train": ["train.txt"],
-        "val": ["vaild.txt", "valid.txt", "val.txt"],
-        "test": ["test.txt"],
-    }[split]
+def has_images(path: Path) -> bool:
+    if not path.is_dir():
+        return False
+    return any(
+        child.is_file() and child.suffix.lower() in IMAGE_EXTENSIONS
+        for child in path.iterdir()
+    )
+
+
+def resolve_dataset_names(requested: list[str]) -> list[str]:
+    seen = set()
+    datasets = []
+    for dataset_name in requested:
+        if dataset_name not in DATASET_LAYOUT:
+            valid = ", ".join(DATASET_LAYOUT)
+            raise ValueError(f"Unknown dataset '{dataset_name}'. Expected one of: {valid}.")
+        if dataset_name not in seen:
+            datasets.append(dataset_name)
+            seen.add(dataset_name)
+    return datasets
+
+
+def build_train_schedule(selected_datasets: list[str]) -> list[str]:
+    selected = set(selected_datasets)
+    schedule = [dataset_name for dataset_name in TRAIN_SCHEDULE if dataset_name in selected]
+    for dataset_name in selected_datasets:
+        if dataset_name not in schedule:
+            schedule.append(dataset_name)
+    return schedule
+
+
+def resolve_subset_root(dataset_root: Path, dataset_name: str, meta: dict) -> Path:
+    candidates = [
+        dataset_root / meta["folder"],
+        dataset_root / meta["archive_folder"],
+    ]
     for candidate in candidates:
-        path = split_root / candidate
-        if path.is_file():
-            return path
+        if candidate.is_dir():
+            return candidate
     raise FileNotFoundError(
-        f"Unable to locate the text file for split '{split}' under {split_root}."
+        f"Unable to locate the {dataset_name} directory under {dataset_root}. "
+        f"Searched: {', '.join(str(path) for path in candidates)}."
+    )
+
+
+def resolve_text_file(
+    search_roots: list[Path],
+    candidates: list[str],
+    dataset_name: str,
+    split: str,
+) -> Path:
+    checked = []
+    for root in search_roots:
+        for candidate in candidates:
+            path = root / candidate
+            checked.append(path)
+            if path.is_file():
+                return path
+    raise FileNotFoundError(
+        f"Unable to locate the {split} prompt file for {dataset_name}. "
+        f"Searched: {', '.join(str(path) for path in checked)}."
+    )
+
+
+def resolve_image_dir(
+    candidates: list[Path],
+    dataset_name: str,
+    split: str,
+) -> Path:
+    checked = []
+    for candidate in candidates:
+        checked.append(candidate)
+        if has_images(candidate):
+            return candidate
+
+    # Official archives may add one extra named directory inside the subset root.
+    for candidate in candidates:
+        if not candidate.is_dir():
+            continue
+        for child in sorted(candidate.iterdir()):
+            checked.append(child)
+            if has_images(child):
+                return child
+
+    raise FileNotFoundError(
+        f"Unable to locate {split} images for {dataset_name}. "
+        f"Searched: {', '.join(str(path) for path in checked)}."
     )
 
 
@@ -158,12 +265,33 @@ def build_dataloaders(args, device: torch.device) -> tuple[dict[str, DataLoader]
     train_loaders = {}
     val_loaders = {}
     pin_memory = device.type == "cuda"
+    dataset_root = Path(args.dataset)
+    validation_root = Path(args.validation_root) if args.validation_root else dataset_root
+    selected_datasets = resolve_dataset_names(args.datasets)
 
-    for dataset_name, meta in DATASET_LAYOUT.items():
-        split_root = Path(args.dataset) / meta["folder"]
+    for dataset_name in selected_datasets:
+        meta = DATASET_LAYOUT[dataset_name]
+        split_root = resolve_subset_root(dataset_root, dataset_name, meta)
+        archive_root = split_root / meta["archive_folder"]
+        train_image_dir = resolve_image_dir(
+            [
+                split_root / "train",
+                split_root / "images",
+                archive_root,
+                split_root,
+            ],
+            dataset_name,
+            "training",
+        )
+        train_text_path = resolve_text_file(
+            [split_root, archive_root],
+            meta["train_text"],
+            dataset_name,
+            "training",
+        )
         train_dataset = MyDataset(
-            split_root / "train",
-            resolve_text_file(split_root, "train"),
+            train_image_dir,
+            train_text_path,
             transforms.Compose(
                 [
                     transforms.RandomCrop(tuple(args.patch_size)),
@@ -171,23 +299,58 @@ def build_dataloaders(args, device: torch.device) -> tuple[dict[str, DataLoader]
                 ]
             ),
         )
-        val_dataset = MyDataset(
-            split_root / "val",
-            resolve_text_file(split_root, "val"),
-            transforms.Compose(
-                [
-                    transforms.CenterCrop(meta["eval_size"]),
-                    transforms.ToTensor(),
-                ]
-            ),
-        )
-
         train_loaders[dataset_name] = DataLoader(
             train_dataset,
             batch_size=args.batch_size,
             shuffle=True,
             num_workers=args.num_workers,
             pin_memory=pin_memory,
+        )
+        print(
+            f"{dataset_name} training: {len(train_dataset)} images from {train_image_dir}; "
+            f"prompts from {train_text_path}"
+        )
+
+        if args.no_validation:
+            continue
+
+        validation_archive_root = validation_root / "vaild"
+        validation_valid_root = validation_root / "valid"
+        val_image_dir = resolve_image_dir(
+            [
+                validation_archive_root / meta["archive_folder"],
+                validation_valid_root / meta["archive_folder"],
+                validation_root / meta["archive_folder"],
+                split_root / "val",
+                split_root / "vaild",
+                split_root / "valid",
+            ],
+            dataset_name,
+            "validation",
+        )
+        val_text_path = resolve_text_file(
+            [
+                validation_archive_root,
+                validation_valid_root,
+                validation_root,
+                split_root,
+                split_root / "val",
+                split_root / "vaild",
+                split_root / "valid",
+            ],
+            meta["val_text"],
+            dataset_name,
+            "validation",
+        )
+        val_dataset = MyDataset(
+            val_image_dir,
+            val_text_path,
+            transforms.Compose(
+                [
+                    transforms.CenterCrop(meta["eval_size"]),
+                    transforms.ToTensor(),
+                ]
+            ),
         )
         val_loaders[dataset_name] = DataLoader(
             val_dataset,
@@ -196,8 +359,67 @@ def build_dataloaders(args, device: torch.device) -> tuple[dict[str, DataLoader]
             num_workers=args.num_workers,
             pin_memory=pin_memory,
         )
+        print(
+            f"{dataset_name} validation: {len(val_dataset)} images from {val_image_dir}; "
+            f"prompts from {val_text_path}"
+        )
 
     return train_loaders, val_loaders
+
+
+def train_batch(
+    model: nn.Module,
+    text_model,
+    batch: tuple[torch.Tensor, tuple[str, ...]],
+    criterion: RateDistortionLoss,
+    optimizer: optim.Optimizer,
+    aux_optimizer: optim.Optimizer,
+    clip_max_norm: float,
+) -> tuple[dict[str, torch.Tensor], torch.Tensor]:
+    device = next(model.parameters()).device
+    images, prompts = batch
+    images = images.to(device, non_blocking=True)
+    text_features = encode_text_batch(text_model, prompts, device)
+
+    optimizer.zero_grad()
+    aux_optimizer.zero_grad()
+
+    out_net = model(images, text_features)
+    out_loss = criterion(out_net, images)
+    out_loss["loss"].backward()
+
+    if clip_max_norm > 0:
+        torch.nn.utils.clip_grad_norm_(model.parameters(), clip_max_norm)
+    optimizer.step()
+
+    aux_loss = model.aux_loss()
+    aux_loss.backward()
+    aux_optimizer.step()
+    return out_loss, aux_loss
+
+
+def print_train_metrics(
+    prefix: str,
+    out_loss: dict[str, torch.Tensor],
+    aux_loss: torch.Tensor,
+    metric: str,
+) -> None:
+    if metric == "mse":
+        print(
+            f"{prefix} "
+            f"loss={out_loss['loss'].item():.4f} "
+            f"mse={out_loss['mse_loss'].item():.6f} "
+            f"bpp={out_loss['bpp_loss'].item():.4f} "
+            f"aux={aux_loss.item():.4f}"
+        )
+    else:
+        print(
+            f"{prefix} "
+            f"loss={out_loss['loss'].item():.4f} "
+            f"ms-ssim={out_loss['ms_ssim_loss'].item():.6f} "
+            f"bpp={out_loss['bpp_loss'].item():.4f} "
+            f"aux={aux_loss.item():.4f}"
+        )
 
 
 def train_one_loader(
@@ -210,52 +432,68 @@ def train_one_loader(
     epoch: int,
     clip_max_norm: float,
     metric: str,
-) -> None:
+    log_interval: int = 100,
+) -> float:
     model.train()
-    device = next(model.parameters()).device
+    loss_meter = AverageMeter()
 
-    for step, (images, prompts) in enumerate(loader):
-        images = images.to(device, non_blocking=True)
-        text_features = encode_text_batch(text_model, prompts, device)
+    for step, batch in enumerate(loader):
+        batch_size = batch[0].size(0)
+        out_loss, aux_loss = train_batch(
+            model=model,
+            text_model=text_model,
+            batch=batch,
+            criterion=criterion,
+            optimizer=optimizer,
+            aux_optimizer=aux_optimizer,
+            clip_max_norm=clip_max_norm,
+        )
+        loss_meter.update(out_loss["loss"], batch_size)
 
-        optimizer.zero_grad()
-        aux_optimizer.zero_grad()
+        if log_interval > 0 and step % log_interval == 0:
+            prefix = (
+                f"Train epoch {epoch}: [{step * batch_size}/{len(loader.dataset)} "
+                f"({100.0 * step / max(len(loader), 1):.0f}%)]"
+            )
+            print_train_metrics(prefix, out_loss, aux_loss, metric)
 
-        out_net = model(images, text_features)
-        out_loss = criterion(out_net, images)
-        out_loss["loss"].backward()
+    return loss_meter.avg
 
-        if clip_max_norm > 0:
-            torch.nn.utils.clip_grad_norm_(model.parameters(), clip_max_norm)
-        optimizer.step()
 
-        aux_loss = model.aux_loss()
-        aux_loss.backward()
-        aux_optimizer.step()
+def next_training_batch(
+    dataset_name: str,
+    train_loaders: dict[str, DataLoader],
+    loader_iterators: dict[str, object],
+):
+    try:
+        return next(loader_iterators[dataset_name])
+    except StopIteration:
+        loader_iterators[dataset_name] = iter(train_loaders[dataset_name])
+        return next(loader_iterators[dataset_name])
 
-        if step % 100 == 0:
-            if metric == "mse":
-                print(
-                    f"Train epoch {epoch}: [{step * len(images)}/{len(loader.dataset)} "
-                    f"({100.0 * step / max(len(loader), 1):.0f}%)] "
-                    f"loss={out_loss['loss'].item():.4f} "
-                    f"mse={out_loss['mse_loss'].item():.6f} "
-                    f"bpp={out_loss['bpp_loss'].item():.4f} "
-                    f"aux={aux_loss.item():.4f}"
-                )
-            else:
-                print(
-                    f"Train epoch {epoch}: [{step * len(images)}/{len(loader.dataset)} "
-                    f"({100.0 * step / max(len(loader), 1):.0f}%)] "
-                    f"loss={out_loss['loss'].item():.4f} "
-                    f"ms-ssim={out_loss['ms_ssim_loss'].item():.6f} "
-                    f"bpp={out_loss['bpp_loss'].item():.4f} "
-                    f"aux={aux_loss.item():.4f}"
-                )
+
+def maybe_validate(
+    progress_label: str,
+    progress_value: int,
+    model: nn.Module,
+    text_model,
+    val_loaders: dict[str, DataLoader],
+    criterion: RateDistortionLoss,
+    metric: str,
+    fallback_loss: float,
+) -> float:
+    if val_loaders:
+        return evaluate(progress_label, progress_value, model, text_model, val_loaders, criterion, metric)
+    print(
+        f"Validation skipped at {progress_label} {progress_value}: "
+        "no validation loaders were configured."
+    )
+    return fallback_loss
 
 
 def evaluate(
-    epoch: int,
+    progress_label: str,
+    progress_value: int,
     model: nn.Module,
     text_model,
     val_loaders: dict[str, DataLoader],
@@ -288,7 +526,7 @@ def evaluate(
 
     metric_name = "psnr" if metric == "mse" else "ms-ssim"
     print(
-        f"Validation epoch {epoch}: "
+        f"Validation {progress_label} {progress_value}: "
         f"loss={loss_meter.avg:.4f} "
         f"{metric_name}={distortion_meter.avg:.4f} "
         f"bpp={bpp_meter.avg:.4f} "
@@ -300,6 +538,7 @@ def evaluate(
 def build_checkpoint_payload(
     model: nn.Module,
     epoch: int,
+    global_step: int,
     loss: float,
     best_loss: float,
     args,
@@ -310,6 +549,7 @@ def build_checkpoint_payload(
 ) -> dict:
     checkpoint = {
         "epoch": epoch,
+        "global_step": global_step,
         "state_dict": unwrap_model(model).state_dict(),
         "loss": loss,
         "best_loss": best_loss,
@@ -329,14 +569,240 @@ def build_checkpoint_payload(
 
 def save_checkpoint(
     state: dict,
-    epoch: int,
+    marker: int,
     save_dir: Path,
     save_epoch_checkpoints: bool = False,
+    marker_name: str = "epoch",
 ) -> None:
     save_dir.mkdir(parents=True, exist_ok=True)
     torch.save(state, save_dir / "checkpoint_latest.pth.tar")
     if save_epoch_checkpoints:
-        torch.save(state, save_dir / f"{epoch}.pth.tar")
+        if marker_name == "epoch":
+            filename = f"{marker}.pth.tar"
+        else:
+            filename = f"{marker_name}_{marker}.pth.tar"
+        torch.save(state, save_dir / filename)
+
+
+def run_epoch_training(
+    args,
+    model: nn.Module,
+    text_model,
+    train_loaders: dict[str, DataLoader],
+    val_loaders: dict[str, DataLoader],
+    criterion: RateDistortionLoss,
+    optimizer: optim.Optimizer,
+    aux_optimizer: optim.Optimizer,
+    scheduler: optim.lr_scheduler.LRScheduler,
+    save_dir: Path,
+    writer,
+    start_epoch: int,
+    start_global_step: int,
+    best_loss: float,
+) -> None:
+    train_schedule = build_train_schedule(resolve_dataset_names(args.datasets))
+    global_step = start_global_step
+
+    for epoch in range(start_epoch, args.epochs):
+        print(f"Epoch {epoch} | lr={optimizer.param_groups[0]['lr']:.2e}")
+        last_train_loss = float("inf")
+        for dataset_name in train_schedule:
+            print(f"Training subset: {dataset_name}")
+            train_loss = train_one_loader(
+                model=model,
+                text_model=text_model,
+                loader=train_loaders[dataset_name],
+                criterion=criterion,
+                optimizer=optimizer,
+                aux_optimizer=aux_optimizer,
+                epoch=epoch,
+                clip_max_norm=args.clip_max_norm,
+                metric=args.metric,
+                log_interval=args.log_interval_steps,
+            )
+            global_step += len(train_loaders[dataset_name])
+            last_train_loss = train_loss
+            if writer is not None:
+                writer.add_scalar(f"train/{dataset_name}_loss", train_loss, global_step)
+
+        fallback_loss = last_train_loss if math.isfinite(last_train_loss) else best_loss
+        val_loss = maybe_validate(
+            "epoch",
+            epoch,
+            model,
+            text_model,
+            val_loaders,
+            criterion,
+            args.metric,
+            fallback_loss,
+        )
+        if writer is not None:
+            writer.add_scalar("val/loss", val_loss, epoch)
+        scheduler.step()
+
+        best_loss = min(best_loss, val_loss)
+        if args.save:
+            checkpoint = build_checkpoint_payload(
+                model=model,
+                epoch=epoch,
+                global_step=global_step,
+                loss=val_loss,
+                best_loss=best_loss,
+                args=args,
+                include_training_state=args.save_training_state,
+                optimizer=optimizer,
+                aux_optimizer=aux_optimizer,
+                scheduler=scheduler,
+            )
+            save_checkpoint(
+                checkpoint,
+                epoch,
+                save_dir,
+                save_epoch_checkpoints=args.save_epoch_checkpoints,
+            )
+
+
+def run_step_training(
+    args,
+    model: nn.Module,
+    text_model,
+    train_loaders: dict[str, DataLoader],
+    val_loaders: dict[str, DataLoader],
+    criterion: RateDistortionLoss,
+    optimizer: optim.Optimizer,
+    aux_optimizer: optim.Optimizer,
+    scheduler: optim.lr_scheduler.LRScheduler,
+    save_dir: Path,
+    writer,
+    start_global_step: int,
+    best_loss: float,
+) -> None:
+    train_schedule = build_train_schedule(resolve_dataset_names(args.datasets))
+    loader_iterators = {
+        dataset_name: iter(train_loaders[dataset_name]) for dataset_name in train_loaders
+    }
+    global_step = start_global_step
+    last_loss = best_loss if math.isfinite(best_loss) else float("inf")
+    last_eval_step = -1
+
+    if global_step >= args.max_steps:
+        print(
+            f"Checkpoint global_step={global_step} is already at or beyond "
+            f"--max-steps={args.max_steps}; skipping training."
+        )
+
+    while global_step < args.max_steps:
+        dataset_name = train_schedule[global_step % len(train_schedule)]
+        batch = next_training_batch(dataset_name, train_loaders, loader_iterators)
+        model.train()
+        out_loss, aux_loss = train_batch(
+            model=model,
+            text_model=text_model,
+            batch=batch,
+            criterion=criterion,
+            optimizer=optimizer,
+            aux_optimizer=aux_optimizer,
+            clip_max_norm=args.clip_max_norm,
+        )
+        global_step += 1
+        scheduler.step()
+        last_loss = float(out_loss["loss"].detach())
+
+        if writer is not None:
+            writer.add_scalar("train/loss", last_loss, global_step)
+            writer.add_scalar("train/bpp", float(out_loss["bpp_loss"].detach()), global_step)
+            writer.add_scalar("train/aux_loss", float(aux_loss.detach()), global_step)
+
+        if args.log_interval_steps > 0 and (
+            global_step == 1 or global_step % args.log_interval_steps == 0
+        ):
+            prefix = (
+                f"Train step {global_step}/{args.max_steps} "
+                f"| subset={dataset_name} | lr={optimizer.param_groups[0]['lr']:.2e}"
+            )
+            print_train_metrics(prefix, out_loss, aux_loss, args.metric)
+
+        checkpoint_loss = last_loss
+        if (
+            args.validation_interval_steps > 0
+            and global_step % args.validation_interval_steps == 0
+        ):
+            checkpoint_loss = maybe_validate(
+                "step",
+                global_step,
+                model,
+                text_model,
+                val_loaders,
+                criterion,
+                args.metric,
+                last_loss,
+            )
+            last_eval_step = global_step
+            best_loss = min(best_loss, checkpoint_loss)
+            if writer is not None:
+                writer.add_scalar("val/loss", checkpoint_loss, global_step)
+
+        if (
+            args.save
+            and args.checkpoint_interval_steps > 0
+            and global_step % args.checkpoint_interval_steps == 0
+        ):
+            checkpoint = build_checkpoint_payload(
+                model=model,
+                epoch=-1,
+                global_step=global_step,
+                loss=checkpoint_loss,
+                best_loss=best_loss,
+                args=args,
+                include_training_state=args.save_training_state,
+                optimizer=optimizer,
+                aux_optimizer=aux_optimizer,
+                scheduler=scheduler,
+            )
+            save_checkpoint(
+                checkpoint,
+                global_step,
+                save_dir,
+                save_epoch_checkpoints=args.save_epoch_checkpoints,
+                marker_name="step",
+            )
+
+    if args.validation_interval_steps > 0 and val_loaders and last_eval_step != global_step:
+        final_loss = evaluate(
+            "step",
+            global_step,
+            model,
+            text_model,
+            val_loaders,
+            criterion,
+            args.metric,
+        )
+        best_loss = min(best_loss, final_loss)
+        if writer is not None:
+            writer.add_scalar("val/loss", final_loss, global_step)
+    else:
+        final_loss = last_loss if math.isfinite(last_loss) else best_loss
+
+    if args.save:
+        checkpoint = build_checkpoint_payload(
+            model=model,
+            epoch=-1,
+            global_step=global_step,
+            loss=final_loss,
+            best_loss=best_loss,
+            args=args,
+            include_training_state=args.save_training_state,
+            optimizer=optimizer,
+            aux_optimizer=aux_optimizer,
+            scheduler=scheduler,
+        )
+        save_checkpoint(
+            checkpoint,
+            global_step,
+            save_dir,
+            save_epoch_checkpoints=args.save_epoch_checkpoints,
+            marker_name="step",
+        )
 
 
 def parse_args(argv):
@@ -351,6 +817,28 @@ def parse_args(argv):
         help="Model name kept for compatibility with the original release.",
     )
     parser.add_argument("-e", "--epochs", default=50, type=int)
+    parser.add_argument(
+        "--training-mode",
+        choices=["epoch", "step"],
+        default="epoch",
+        help=(
+            "Use the original epoch loop or the paper-style optimizer-step schedule. "
+            "Step mode defaults to 2,000,000 updates if --max-steps is not set."
+        ),
+    )
+    parser.add_argument(
+        "--max-steps",
+        default=None,
+        type=int,
+        help="Number of optimizer updates to run in step mode.",
+    )
+    parser.add_argument(
+        "--datasets",
+        nargs="+",
+        default=list(DATASET_LAYOUT),
+        choices=list(DATASET_LAYOUT),
+        help="Subset names to include. Defaults to all PKU-AIGI-500K training subsets.",
+    )
     parser.add_argument("--batch-size", default=4, type=int)
     parser.add_argument("--test-batch-size", default=1, type=int)
     parser.add_argument("--num-workers", default=8, type=int)
@@ -363,6 +851,48 @@ def parse_args(argv):
     parser.add_argument("--checkpoint", default=None, type=str)
     parser.add_argument("--metric", default="mse", choices=["mse", "ms-ssim"])
     parser.add_argument("--lr-epoch", nargs="*", default=[45, 48], type=int)
+    parser.add_argument(
+        "--lr-step",
+        nargs="*",
+        default=DEFAULT_STEP_MILESTONES,
+        type=int,
+        help=(
+            "Optimizer-step milestones for step mode. The CATC paper describes "
+            "drops after 1.6M and 1.85M steps."
+        ),
+    )
+    parser.add_argument(
+        "--log-interval-steps",
+        default=100,
+        type=int,
+        help="Training log interval, measured in optimizer updates.",
+    )
+    parser.add_argument(
+        "--validation-interval-steps",
+        default=50000,
+        type=int,
+        help="Validation interval in step mode. Set to 0 to skip periodic validation.",
+    )
+    parser.add_argument(
+        "--checkpoint-interval-steps",
+        default=50000,
+        type=int,
+        help="Checkpoint interval in step mode. Set to 0 to save only at the end.",
+    )
+    parser.add_argument(
+        "--validation-root",
+        default=None,
+        type=str,
+        help=(
+            "Optional root containing the extracted validation archive. "
+            "If omitted, the dataset root is searched."
+        ),
+    )
+    parser.add_argument(
+        "--no-validation",
+        action="store_true",
+        help="Train without constructing validation loaders.",
+    )
     parser.add_argument("--cuda", action="store_true", help="Use CUDA if available")
     parser.add_argument("--clip-model", default="ViT-B/32", type=str)
     parser.add_argument("--hidden-channels", default=128, type=int)
@@ -392,6 +922,9 @@ def parse_args(argv):
 
 def main(argv) -> None:
     args = parse_args(argv)
+    args.datasets = resolve_dataset_names(args.datasets)
+    if args.training_mode == "step" and args.max_steps is None:
+        args.max_steps = 2_000_000
 
     if args.seed is not None:
         random.seed(args.seed)
@@ -419,7 +952,8 @@ def main(argv) -> None:
         model = CustomDataParallel(model)
 
     optimizer, aux_optimizer = configure_optimizers(model, args)
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.lr_epoch, gamma=0.1)
+    lr_milestones = args.lr_step if args.training_mode == "step" else args.lr_epoch
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=lr_milestones, gamma=0.1)
     criterion = RateDistortionLoss(lmbda=args.lmbda, metric=args.metric)
 
     writer = None
@@ -428,6 +962,8 @@ def main(argv) -> None:
         writer = SummaryWriter(str(save_dir) + "_tensorboard")
 
     start_epoch = 0
+    start_global_step = 0
+    best_loss = float("inf")
     if args.checkpoint:
         print(f"Loading checkpoint from {args.checkpoint}")
         checkpoint = torch.load(args.checkpoint, map_location=device)
@@ -436,6 +972,7 @@ def main(argv) -> None:
             for key, value in checkpoint["state_dict"].items()
         }
         model.load_state_dict(state_dict)
+        best_loss = float(checkpoint.get("best_loss", best_loss))
         if "optimizer" in checkpoint:
             optimizer.load_state_dict(checkpoint["optimizer"])
         else:
@@ -449,47 +986,41 @@ def main(argv) -> None:
         else:
             print("Checkpoint does not include scheduler state; using a fresh scheduler.")
         start_epoch = int(checkpoint.get("epoch", -1)) + 1
+        start_global_step = int(checkpoint.get("global_step", 0))
 
-    best_loss = float("inf")
-    for epoch in range(start_epoch, args.epochs):
-        print(f"Epoch {epoch} | lr={optimizer.param_groups[0]['lr']:.2e}")
-        for dataset_name in TRAIN_SCHEDULE:
-            train_one_loader(
-                model=model,
-                text_model=text_model,
-                loader=train_loaders[dataset_name],
-                criterion=criterion,
-                optimizer=optimizer,
-                aux_optimizer=aux_optimizer,
-                epoch=epoch,
-                clip_max_norm=args.clip_max_norm,
-                metric=args.metric,
-            )
-
-        val_loss = evaluate(epoch, model, text_model, val_loaders, criterion, args.metric)
-        if writer is not None:
-            writer.add_scalar("val/loss", val_loss, epoch)
-        scheduler.step()
-
-        best_loss = min(best_loss, val_loss)
-        if args.save:
-            checkpoint = build_checkpoint_payload(
-                model=model,
-                epoch=epoch,
-                loss=val_loss,
-                best_loss=best_loss,
-                args=args,
-                include_training_state=args.save_training_state,
-                optimizer=optimizer,
-                aux_optimizer=aux_optimizer,
-                scheduler=scheduler,
-            )
-            save_checkpoint(
-                checkpoint,
-                epoch,
-                save_dir,
-                save_epoch_checkpoints=args.save_epoch_checkpoints,
-            )
+    if args.training_mode == "epoch":
+        run_epoch_training(
+            args=args,
+            model=model,
+            text_model=text_model,
+            train_loaders=train_loaders,
+            val_loaders=val_loaders,
+            criterion=criterion,
+            optimizer=optimizer,
+            aux_optimizer=aux_optimizer,
+            scheduler=scheduler,
+            save_dir=save_dir,
+            writer=writer,
+            start_epoch=start_epoch,
+            start_global_step=start_global_step,
+            best_loss=best_loss,
+        )
+    else:
+        run_step_training(
+            args=args,
+            model=model,
+            text_model=text_model,
+            train_loaders=train_loaders,
+            val_loaders=val_loaders,
+            criterion=criterion,
+            optimizer=optimizer,
+            aux_optimizer=aux_optimizer,
+            scheduler=scheduler,
+            save_dir=save_dir,
+            writer=writer,
+            start_global_step=start_global_step,
+            best_loss=best_loss,
+        )
 
     if writer is not None:
         writer.close()
