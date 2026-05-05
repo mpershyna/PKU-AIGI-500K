@@ -61,3 +61,28 @@
 - 2026-05-05: Added `checkpoints/` to `.gitignore` after seeing the local training output directory appear as untracked.
 - 2026-05-05: Patched `code/train.py` so step-mode training saves an interval checkpoint immediately before interval validation, then overwrites it with a validation-scored checkpoint if validation succeeds.
 - 2026-05-05: Syntax-checked `code/train.py` after adding the pre-validation checkpoint save.
+- 2026-05-05: User asked how image files are associated with text prompts in files like `data/MJ/MJ.txt`.
+- 2026-05-05: Inspected `code/model/dataset.py` and confirmed the loader extracts the leading numeric prefix from each image filename, subtracts one, and uses that as the zero-based prompt-line index.
+- 2026-05-05: Checked MJ training filenames and confirmed examples like `0001_1.png` through `0001_4.png` all map to prompt line 1, while `0010_1.png` through `0010_4.png` all map to prompt line 10.
+- 2026-05-05: Confirmed Python sees 3,315 MJ prompt records in `MJ.txt`; `wc -l` reports 3,314 because the final line appears not to end with a newline.
+- 2026-05-05: User asked to move 1,000 random images from `data/MJ/train` into `data/MJ/validate`, another 1,000 random images into `data/MJ/test`, and amend training to use only the MJ train/validate data.
+- 2026-05-05: Confirmed no training process was running before moving MJ files.
+- 2026-05-05: Created `data/MJ/validate` and `data/MJ/test`, then moved 2,000 randomly selected files out of `data/MJ/train`: 1,000 into validate and 1,000 into test.
+- 2026-05-05: Verified the resulting MJ split counts are 11,240 files in `train`, 1,000 files in `validate`, and 1,000 files in `test`.
+- 2026-05-05: Patched `code/train.py` so the default dataset selection is MJ-only.
+- 2026-05-05: Patched `code/train.py` so local validation folders such as `data/MJ/validate` are preferred over the separate public `data/vaild/MJ` archive for validation.
+- 2026-05-05: Patched `code/train.py` so direct split folders like `data/MJ/train` are not expanded to sibling child directories such as `validate` or `test`.
+- 2026-05-05: Syntax-checked `code/train.py` after the MJ-only split changes.
+- 2026-05-05: Built MJ-only dataloaders without training and verified training uses only `data/MJ/train` with 11,240 images, validation uses only `data/MJ/validate` with 1,000 images, and both use `data/MJ/MJ.txt` for prompt lookup.
+- 2026-05-05: User asked to mirror training progress output to `checkpoints/stdout_log.txt` or a command-line-specified file and to add timestamps to printed output.
+- 2026-05-05: Patched `code/train.py` with a `TimestampedTee` stdout/stderr wrapper so console output receives timestamps and is mirrored to a log file.
+- 2026-05-05: Added `--log-file` to `code/train.py`, defaulting to `checkpoints/stdout_log.txt`; `--log-file none` disables file mirroring while keeping timestamped console output.
+- 2026-05-05: Syntax-checked `code/train.py` after the logging patch.
+- 2026-05-05: Ran a no-training logging smoke test that wrote timestamped output to `checkpoints/stdout_log_smoketest.txt` and confirmed the file contained the mirrored timestamped lines.
+- 2026-05-05: User asked why `ls data/MJ/train` appeared to show only about 3,000 images after a previous count found 13,240 files.
+- 2026-05-05: Verified `ls -1`, plain `ls` piped to `wc -l`, and `find` all report 13,240 files in `data/MJ/train`; the apparent lower count is due to interactive `ls` displaying filenames in columns and terminal scrollback limits.
+- 2026-05-05: Note that the earlier 13,240-file MJ/train count was taken before the later MJ train/validate/test split; after moving 1,000 files to validate and 1,000 to test, the current MJ/train count is 11,240.
+- 2026-05-05: User asked to remove the `checkpoints/` folder from the most recent git commit.
+- 2026-05-05: Confirmed the latest commit tracked files under `checkpoints/`, including model checkpoint, TensorBoard event files, and stdout log files.
+- 2026-05-05: Removed `checkpoints/` from the git index with `git rm --cached -r checkpoints` so local checkpoint files remain on disk while the amended commit no longer tracks them.
+- 2026-05-05: Ensured `.gitignore` includes `checkpoints/` so the local checkpoint directory is not re-added to future commits.

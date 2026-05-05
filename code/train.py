@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import atexit
+from datetime import datetime
 import math
 import random
 import sys
@@ -82,9 +84,62 @@ DEFAULT_STEP_MILESTONES = [1_600_000, 1_850_000]
 DISABLED_DATASETS = {
     "SDXL": "The public Hugging Face files do not include the SDXL training prompt text.",
 }
-DEFAULT_DATASETS = [
-    dataset_name for dataset_name in DATASET_LAYOUT if dataset_name not in DISABLED_DATASETS
-]
+DEFAULT_DATASETS = ["MJ"]
+
+
+class TimestampedTee:
+    def __init__(self, *streams) -> None:
+        self.streams = streams
+        self.at_line_start = True
+
+    def write(self, message: str) -> int:
+        if not message:
+            return 0
+
+        for chunk in message.splitlines(keepends=True):
+            output = chunk
+            if self.at_line_start and chunk not in {"\n", "\r\n"}:
+                output = f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {chunk}"
+
+            for stream in self.streams:
+                stream.write(output)
+
+            self.at_line_start = chunk.endswith(("\n", "\r"))
+        return len(message)
+
+    def flush(self) -> None:
+        for stream in self.streams:
+            stream.flush()
+
+    def isatty(self) -> bool:
+        return bool(self.streams) and self.streams[0].isatty()
+
+
+def setup_logging(log_file: str | None) -> None:
+    original_stdout = sys.stdout
+    original_stderr = sys.stderr
+    log_handle = None
+
+    if log_file and log_file.lower() != "none":
+        log_path = Path(log_file)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_handle = log_path.open("a", encoding="utf-8", buffering=1)
+        sys.stdout = TimestampedTee(original_stdout, log_handle)
+        sys.stderr = TimestampedTee(original_stderr, log_handle)
+        print(f"Mirroring timestamped stdout/stderr to {log_path}")
+    else:
+        sys.stdout = TimestampedTee(original_stdout)
+        sys.stderr = TimestampedTee(original_stderr)
+
+    def restore_logging() -> None:
+        sys.stdout.flush()
+        sys.stderr.flush()
+        sys.stdout = original_stdout
+        sys.stderr = original_stderr
+        if log_handle is not None:
+            log_handle.close()
+
+    atexit.register(restore_logging)
 
 
 def compute_msssim(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
@@ -211,6 +266,14 @@ def build_train_schedule(selected_datasets: list[str]) -> list[str]:
     return schedule
 
 
+def is_relative_to(path: Path, parent: Path) -> bool:
+    try:
+        path.resolve().relative_to(parent.resolve())
+    except ValueError:
+        return False
+    return True
+
+
 def resolve_subset_root(dataset_root: Path, dataset_name: str, meta: dict) -> Path:
     candidates = [
         dataset_root / meta["folder"],
@@ -261,6 +324,9 @@ def resolve_image_dirs(
         if has_images(candidate):
             image_dirs.append(candidate)
 
+    if image_dirs:
+        return dedupe_paths(image_dirs)
+
     if include_child_dirs:
         # Official training archives may add one extra named directory inside the subset root.
         for candidate in candidates:
@@ -271,22 +337,26 @@ def resolve_image_dirs(
                 if has_images(child):
                     image_dirs.append(child)
 
-    deduped = []
-    seen = set()
-    for image_dir in image_dirs:
-        resolved = image_dir.resolve()
-        if resolved in seen:
-            continue
-        deduped.append(image_dir)
-        seen.add(resolved)
-
-    if deduped:
-        return deduped
+    image_dirs = dedupe_paths(image_dirs)
+    if image_dirs:
+        return image_dirs
 
     raise FileNotFoundError(
         f"Unable to locate {split} images for {dataset_name}. "
         f"Searched: {', '.join(str(path) for path in checked)}."
     )
+
+
+def dedupe_paths(paths: list[Path]) -> list[Path]:
+    deduped = []
+    seen = set()
+    for path in paths:
+        resolved = path.resolve()
+        if resolved in seen:
+            continue
+        deduped.append(path)
+        seen.add(resolved)
+    return deduped
 
 
 def build_dataloaders(args, device: torch.device) -> tuple[dict[str, DataLoader], dict[str, DataLoader]]:
@@ -345,30 +415,55 @@ def build_dataloaders(args, device: torch.device) -> tuple[dict[str, DataLoader]
 
         validation_archive_root = validation_root / "vaild"
         validation_valid_root = validation_root / "valid"
-        val_image_dirs = resolve_image_dirs(
-            [
+        local_validation_roots = [
+            split_root / "validate",
+            split_root / "val",
+            split_root / "valid",
+            split_root / "vaild",
+        ]
+        archive_validation_roots = [
                 validation_archive_root / meta["archive_folder"],
                 validation_valid_root / meta["archive_folder"],
                 validation_root / meta["archive_folder"],
-                split_root / "val",
-                split_root / "vaild",
-                split_root / "valid",
-            ],
-            dataset_name,
-            "validation",
-            include_child_dirs=False,
-        )
-        val_text_path = resolve_text_file(
-            [
+        ]
+        try:
+            val_image_dirs = resolve_image_dirs(
+                local_validation_roots,
+                dataset_name,
+                "validation",
+                include_child_dirs=False,
+            )
+            uses_local_validation = True
+        except FileNotFoundError:
+            val_image_dirs = resolve_image_dirs(
+                archive_validation_roots,
+                dataset_name,
+                "validation",
+                include_child_dirs=False,
+            )
+            uses_local_validation = any(
+                is_relative_to(image_dir, split_root) for image_dir in val_image_dirs
+            )
+        if uses_local_validation:
+            validation_text_roots = [
+                split_root,
+                *val_image_dirs,
+                *local_validation_roots,
+                validation_archive_root,
+                validation_valid_root,
+                validation_root,
+            ]
+        else:
+            validation_text_roots = [
                 validation_archive_root,
                 validation_valid_root,
                 validation_root,
                 split_root,
-                split_root / "val",
-                split_root / "vaild",
-                split_root / "valid",
+                *local_validation_roots,
                 *val_image_dirs,
-            ],
+            ]
+        val_text_path = resolve_text_file(
+            validation_text_roots,
             meta["val_text"],
             dataset_name,
             "validation",
@@ -874,6 +969,15 @@ def parse_args(argv):
     )
     parser.add_argument("-e", "--epochs", default=50, type=int)
     parser.add_argument(
+        "--log-file",
+        default="checkpoints/stdout_log.txt",
+        type=str,
+        help=(
+            "Mirror timestamped stdout/stderr to this file. "
+            "Use 'none' to disable file logging."
+        ),
+    )
+    parser.add_argument(
         "--training-mode",
         choices=["epoch", "step"],
         default="epoch",
@@ -894,9 +998,9 @@ def parse_args(argv):
         default=DEFAULT_DATASETS,
         choices=list(DATASET_LAYOUT),
         help=(
-            "Subset names to include. Defaults to the enabled PKU-AIGI-500K "
-            "training subsets, excluding SDXL because its training prompt file "
-            "is not published with the public Hugging Face files."
+            "Subset names to include. Defaults to MJ for the local MJ-only "
+            "train/validate/test split. SDXL is skipped because its training "
+            "prompt file is not published with the public Hugging Face files."
         ),
     )
     parser.add_argument("--batch-size", default=4, type=int)
@@ -982,6 +1086,7 @@ def parse_args(argv):
 
 def main(argv) -> None:
     args = parse_args(argv)
+    setup_logging(args.log_file)
     args.datasets = resolve_dataset_names(args.datasets)
     if args.training_mode == "step" and args.max_steps is None:
         args.max_steps = 2_000_000
