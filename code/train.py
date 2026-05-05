@@ -35,8 +35,6 @@ TRAIN_SCHEDULE = [
     "MOD",
     "MJ",
     "MOD",
-    "SDXL",
-    "MOD",
     "MJ",
     "MOD",
     "MJ",
@@ -81,6 +79,12 @@ DATASET_LAYOUT = {
 }
 
 DEFAULT_STEP_MILESTONES = [1_600_000, 1_850_000]
+DISABLED_DATASETS = {
+    "SDXL": "The public Hugging Face files do not include the SDXL training prompt text.",
+}
+DEFAULT_DATASETS = [
+    dataset_name for dataset_name in DATASET_LAYOUT if dataset_name not in DISABLED_DATASETS
+]
 
 
 def compute_msssim(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
@@ -187,9 +191,14 @@ def resolve_dataset_names(requested: list[str]) -> list[str]:
         if dataset_name not in DATASET_LAYOUT:
             valid = ", ".join(DATASET_LAYOUT)
             raise ValueError(f"Unknown dataset '{dataset_name}'. Expected one of: {valid}.")
+        if dataset_name in DISABLED_DATASETS:
+            print(f"Skipping disabled dataset {dataset_name}: {DISABLED_DATASETS[dataset_name]}")
+            continue
         if dataset_name not in seen:
             datasets.append(dataset_name)
             seen.add(dataset_name)
+    if not datasets:
+        raise ValueError("No enabled datasets were selected for training.")
     return datasets
 
 
@@ -235,25 +244,44 @@ def resolve_text_file(
     )
 
 
-def resolve_image_dir(
+def format_paths(paths: list[Path]) -> str:
+    return ", ".join(str(path) for path in paths)
+
+
+def resolve_image_dirs(
     candidates: list[Path],
     dataset_name: str,
     split: str,
-) -> Path:
+    include_child_dirs: bool = True,
+) -> list[Path]:
     checked = []
+    image_dirs = []
     for candidate in candidates:
         checked.append(candidate)
         if has_images(candidate):
-            return candidate
+            image_dirs.append(candidate)
 
-    # Official archives may add one extra named directory inside the subset root.
-    for candidate in candidates:
-        if not candidate.is_dir():
+    if include_child_dirs:
+        # Official training archives may add one extra named directory inside the subset root.
+        for candidate in candidates:
+            if not candidate.is_dir():
+                continue
+            for child in sorted(candidate.iterdir()):
+                checked.append(child)
+                if has_images(child):
+                    image_dirs.append(child)
+
+    deduped = []
+    seen = set()
+    for image_dir in image_dirs:
+        resolved = image_dir.resolve()
+        if resolved in seen:
             continue
-        for child in sorted(candidate.iterdir()):
-            checked.append(child)
-            if has_images(child):
-                return child
+        deduped.append(image_dir)
+        seen.add(resolved)
+
+    if deduped:
+        return deduped
 
     raise FileNotFoundError(
         f"Unable to locate {split} images for {dataset_name}. "
@@ -273,7 +301,7 @@ def build_dataloaders(args, device: torch.device) -> tuple[dict[str, DataLoader]
         meta = DATASET_LAYOUT[dataset_name]
         split_root = resolve_subset_root(dataset_root, dataset_name, meta)
         archive_root = split_root / meta["archive_folder"]
-        train_image_dir = resolve_image_dir(
+        train_image_dirs = resolve_image_dirs(
             [
                 split_root / "train",
                 split_root / "images",
@@ -284,13 +312,13 @@ def build_dataloaders(args, device: torch.device) -> tuple[dict[str, DataLoader]
             "training",
         )
         train_text_path = resolve_text_file(
-            [split_root, archive_root],
+            [split_root, archive_root, *train_image_dirs],
             meta["train_text"],
             dataset_name,
             "training",
         )
         train_dataset = MyDataset(
-            train_image_dir,
+            train_image_dirs,
             train_text_path,
             transforms.Compose(
                 [
@@ -307,7 +335,8 @@ def build_dataloaders(args, device: torch.device) -> tuple[dict[str, DataLoader]
             pin_memory=pin_memory,
         )
         print(
-            f"{dataset_name} training: {len(train_dataset)} images from {train_image_dir}; "
+            f"{dataset_name} training: {len(train_dataset)} images from "
+            f"{format_paths(train_image_dirs)}; "
             f"prompts from {train_text_path}"
         )
 
@@ -316,7 +345,7 @@ def build_dataloaders(args, device: torch.device) -> tuple[dict[str, DataLoader]
 
         validation_archive_root = validation_root / "vaild"
         validation_valid_root = validation_root / "valid"
-        val_image_dir = resolve_image_dir(
+        val_image_dirs = resolve_image_dirs(
             [
                 validation_archive_root / meta["archive_folder"],
                 validation_valid_root / meta["archive_folder"],
@@ -327,6 +356,7 @@ def build_dataloaders(args, device: torch.device) -> tuple[dict[str, DataLoader]
             ],
             dataset_name,
             "validation",
+            include_child_dirs=False,
         )
         val_text_path = resolve_text_file(
             [
@@ -337,13 +367,14 @@ def build_dataloaders(args, device: torch.device) -> tuple[dict[str, DataLoader]
                 split_root / "val",
                 split_root / "vaild",
                 split_root / "valid",
+                *val_image_dirs,
             ],
             meta["val_text"],
             dataset_name,
             "validation",
         )
         val_dataset = MyDataset(
-            val_image_dir,
+            val_image_dirs,
             val_text_path,
             transforms.Compose(
                 [
@@ -360,7 +391,8 @@ def build_dataloaders(args, device: torch.device) -> tuple[dict[str, DataLoader]
             pin_memory=pin_memory,
         )
         print(
-            f"{dataset_name} validation: {len(val_dataset)} images from {val_image_dir}; "
+            f"{dataset_name} validation: {len(val_dataset)} images from "
+            f"{format_paths(val_image_dirs)}; "
             f"prompts from {val_text_path}"
         )
 
@@ -723,10 +755,38 @@ def run_step_training(
             print_train_metrics(prefix, out_loss, aux_loss, args.metric)
 
         checkpoint_loss = last_loss
-        if (
+        should_validate = (
             args.validation_interval_steps > 0
             and global_step % args.validation_interval_steps == 0
-        ):
+        )
+        should_checkpoint = (
+            args.save
+            and args.checkpoint_interval_steps > 0
+            and global_step % args.checkpoint_interval_steps == 0
+        )
+
+        if should_checkpoint and should_validate:
+            checkpoint = build_checkpoint_payload(
+                model=model,
+                epoch=-1,
+                global_step=global_step,
+                loss=checkpoint_loss,
+                best_loss=best_loss,
+                args=args,
+                include_training_state=args.save_training_state,
+                optimizer=optimizer,
+                aux_optimizer=aux_optimizer,
+                scheduler=scheduler,
+            )
+            save_checkpoint(
+                checkpoint,
+                global_step,
+                save_dir,
+                save_epoch_checkpoints=args.save_epoch_checkpoints,
+                marker_name="step",
+            )
+
+        if should_validate:
             checkpoint_loss = maybe_validate(
                 "step",
                 global_step,
@@ -742,11 +802,7 @@ def run_step_training(
             if writer is not None:
                 writer.add_scalar("val/loss", checkpoint_loss, global_step)
 
-        if (
-            args.save
-            and args.checkpoint_interval_steps > 0
-            and global_step % args.checkpoint_interval_steps == 0
-        ):
+        if should_checkpoint:
             checkpoint = build_checkpoint_payload(
                 model=model,
                 epoch=-1,
@@ -835,9 +891,13 @@ def parse_args(argv):
     parser.add_argument(
         "--datasets",
         nargs="+",
-        default=list(DATASET_LAYOUT),
+        default=DEFAULT_DATASETS,
         choices=list(DATASET_LAYOUT),
-        help="Subset names to include. Defaults to all PKU-AIGI-500K training subsets.",
+        help=(
+            "Subset names to include. Defaults to the enabled PKU-AIGI-500K "
+            "training subsets, excluding SDXL because its training prompt file "
+            "is not published with the public Hugging Face files."
+        ),
     )
     parser.add_argument("--batch-size", default=4, type=int)
     parser.add_argument("--test-batch-size", default=1, type=int)

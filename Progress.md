@@ -34,3 +34,30 @@
 - 2026-05-04: Checked the local environment and confirmed Python 3.12.3, pip 24.0, and an NVIDIA H100 with driver-reported CUDA 12.6 are available.
 - 2026-05-04: Confirmed `python3 -m venv` is available, so dependencies can be installed in a no-sudo virtual environment instead of the system Python.
 - 2026-05-04: Confirmed `code/requirements.txt` already includes `git+https://github.com/openai/CLIP.git` along with PyTorch-related dependencies.
+- 2026-05-04: User reported GitHub rejected a password-based `git push` with "Invalid username or token" / "Password authentication is not supported for Git operations."
+- 2026-05-04: Checked the local git remote and confirmed `origin` uses HTTPS at `https://github.com/mpershyna/PKU-AIGI-500K.git` for fetch and push.
+- 2026-05-04: Checked local authentication helpers and found `gh` is not installed and `~/.ssh` currently contains only `authorized_keys`, not a GitHub SSH keypair.
+- 2026-05-04: User reported a training startup failure where `code/train.py` could not locate the SDXL training prompt file.
+- 2026-05-04: Inspected `data/SD-XL` and confirmed the SDXL images are extracted under `data/SD-XL/SD-XL`, but no SDXL training prompt `.txt` file is present there.
+- 2026-05-04: Noted from the startup log that SD21B training was only loading `SD-2_1-B-part1` with 110,000 images, leaving `SD-2_1-B-part2` unused.
+- 2026-05-04: Patched `code/model/dataset.py` so `MyDataset` can load images from multiple directories while preserving the same filename-to-prompt indexing logic.
+- 2026-05-04: Patched `code/train.py` to resolve one or more image directories per subset, so split extraction folders such as `SD-2_1-B-part1` and `SD-2_1-B-part2` are combined into one training dataset.
+- 2026-05-04: Syntax-checked the patched `code/train.py` and `code/model/dataset.py` with an AST parse.
+- 2026-05-04: Verified the patched `MyDataset` counts both SD21B split directories together as 202,265 images when using the repo virtual environment.
+- 2026-05-04: Confirmed `data/SD-XL/SD-XL` contains 105,554 extracted SDXL images and that the remaining blocker is downloading the missing `SD-XL.txt` training prompt file.
+- 2026-05-04: Added `.venv/` to `.gitignore` after seeing the local virtual environment appear as an untracked directory.
+- 2026-05-04: User concluded the SDXL training prompt text is not published on the Hugging Face dataset repository and asked to exclude SDXL from training and validation.
+- 2026-05-04: Patched `code/train.py` to mark SDXL as a disabled dataset because the public files do not include its training prompt text.
+- 2026-05-04: Updated the default training dataset list and subset schedule in `code/train.py` so SDXL is excluded from training and validation by default.
+- 2026-05-04: Added filtering in `resolve_dataset_names()` so SDXL is skipped with a warning even if an older command still includes `--datasets ... SDXL ...`.
+- 2026-05-04: Syntax-checked `code/train.py` after the SDXL exclusion patch and verified via the repo virtual environment that explicit `SDXL` input is filtered to `['SD21B', 'SD21', 'MJ', 'MOD']`.
+- 2026-05-05: User reported training reached step 50,000, then crashed during validation with an `IndexError` because a validation image filename mapped to prompt index 11 while `vaild/MJ.txt` has 10 lines.
+- 2026-05-05: Inspected validation filenames and prompt counts under `data/vaild`; confirmed MJ validation has 10 images and 10 prompt lines.
+- 2026-05-05: Determined the validation loader was accidentally combining `data/vaild/MJ` with the extracted training image directory `data/MJ/MJ` because validation image discovery scanned child directories under the dataset root.
+- 2026-05-05: Patched `code/train.py` so validation image resolution does not scan child directories, preventing training directories from being mixed into validation loaders.
+- 2026-05-05: Syntax-checked `code/train.py` after the validation image discovery fix.
+- 2026-05-05: Built train/validation dataloaders without training and verified validation now uses only `data/vaild/SD21B`, `data/vaild/SD21`, `data/vaild/MJ`, and `data/vaild/MOD`, with counts 40, 40, 10, and 5 respectively.
+- 2026-05-05: Confirmed no `checkpoint_latest.pth.tar` was present under `checkpoints/` after the validation crash, because the crash occurred before the first checkpoint save completed.
+- 2026-05-05: Added `checkpoints/` to `.gitignore` after seeing the local training output directory appear as untracked.
+- 2026-05-05: Patched `code/train.py` so step-mode training saves an interval checkpoint immediately before interval validation, then overwrites it with a validation-scored checkpoint if validation succeeds.
+- 2026-05-05: Syntax-checked `code/train.py` after adding the pre-validation checkpoint save.

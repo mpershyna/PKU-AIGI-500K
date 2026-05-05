@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+from collections.abc import Sequence
 from pathlib import Path
 
 from PIL import Image
@@ -13,14 +14,24 @@ IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 class MyDataset(Dataset):
     """Loads paired images and prompt text from PKU-AIGI-500K splits."""
 
-    def __init__(self, image_dir: str, text_path: str, image_transform=None) -> None:
+    def __init__(
+        self,
+        image_dir: str | Path | Sequence[str | Path],
+        text_path: str | Path,
+        image_transform=None,
+    ) -> None:
         super().__init__()
-        self.image_dir = Path(image_dir)
+        if isinstance(image_dir, (str, Path)):
+            self.image_dirs = [Path(image_dir)]
+        else:
+            self.image_dirs = [Path(path) for path in image_dir]
+        self.image_dir = self.image_dirs[0] if self.image_dirs else Path()
         self.text_path = Path(text_path)
         self.image_transform = image_transform
 
-        if not self.image_dir.is_dir():
-            raise FileNotFoundError(f"Image directory does not exist: {self.image_dir}")
+        for image_path in self.image_dirs:
+            if not image_path.is_dir():
+                raise FileNotFoundError(f"Image directory does not exist: {image_path}")
         if not self.text_path.is_file():
             raise FileNotFoundError(f"Text file does not exist: {self.text_path}")
 
@@ -28,8 +39,9 @@ class MyDataset(Dataset):
             self.text_list = [line.rstrip("\n") for line in handle]
 
         self.image_list = sorted(
-            name
-            for name in os.listdir(self.image_dir)
+            (image_path, name)
+            for image_path in self.image_dirs
+            for name in os.listdir(image_path)
             if Path(name).suffix.lower() in IMAGE_EXTENSIONS
         )
 
@@ -53,8 +65,8 @@ class MyDataset(Dataset):
         return self.text_list[prompt_index]
 
     def __getitem__(self, idx: int):
-        filename = self.image_list[idx]
-        image = Image.open(self.image_dir / filename).convert("RGB")
+        image_dir, filename = self.image_list[idx]
+        image = Image.open(image_dir / filename).convert("RGB")
         if self.image_transform is not None:
             image = self.image_transform(image)
         text = self._lookup_text(filename)
