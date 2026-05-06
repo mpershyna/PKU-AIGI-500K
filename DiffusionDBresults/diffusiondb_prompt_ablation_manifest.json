@@ -1,0 +1,18 @@
+{
+  "experiment_name": "diffusiondb_prompt_ablation",
+  "checkpoint_path": "C:\\Users\\masha\\OneDrive\\Documents\\Playground\\PKU-AIGI-500K\\diffusiondb_prompt_ablation\\checkpoints\\16_0.05\\checkpoint_latest.pth.tar",
+  "dataset_repo": "poloclub/diffusiondb",
+  "diffusiondb_subset": "2m",
+  "part_ids": [
+    1310
+  ],
+  "sample_count": 50,
+  "train_count": 40,
+  "eval_count": 10,
+  "cases": [
+    "correct",
+    "empty",
+    "shuffled_words",
+    "swapped_prompts"
+  ]
+}

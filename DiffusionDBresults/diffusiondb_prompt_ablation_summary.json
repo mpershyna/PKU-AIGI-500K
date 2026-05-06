@@ -1,0 +1,50 @@
+{
+  "correct": {
+    "count": 10.0,
+    "average_image_bitstream": 8749.2,
+    "average_compressed_size": 8836.9,
+    "average_original_image_size": 713247.9,
+    "average_original_text_size": 87.7,
+    "average_prompt_text_size": 87.7,
+    "average_bpp": 0.178721188276242,
+    "average_psnr_db": 7.795194558609476,
+    "average_ms_ssim_db": 0.9480211736731123,
+    "average_elapsed_ms": 1220.1321840286255
+  },
+  "empty": {
+    "count": 10.0,
+    "average_image_bitstream": 8742.0,
+    "average_compressed_size": 8742.0,
+    "average_original_image_size": 713247.9,
+    "average_original_text_size": 87.7,
+    "average_prompt_text_size": 0.0,
+    "average_bpp": 0.176438473432492,
+    "average_psnr_db": 7.771526576217875,
+    "average_ms_ssim_db": 0.9435069279065142,
+    "average_elapsed_ms": 1448.5682725906372
+  },
+  "shuffled_words": {
+    "count": 10.0,
+    "average_image_bitstream": 8758.4,
+    "average_compressed_size": 8846.1,
+    "average_original_image_size": 713247.9,
+    "average_original_text_size": 87.7,
+    "average_prompt_text_size": 87.7,
+    "average_bpp": 0.17893418532151442,
+    "average_psnr_db": 7.795111337397411,
+    "average_ms_ssim_db": 0.9513977059705185,
+    "average_elapsed_ms": 1285.613751411438
+  },
+  "swapped_prompts": {
+    "count": 10.0,
+    "average_image_bitstream": 8758.8,
+    "average_compressed_size": 8846.5,
+    "average_original_image_size": 713247.9,
+    "average_original_text_size": 87.7,
+    "average_prompt_text_size": 87.7,
+    "average_bpp": 0.1787293654221755,
+    "average_psnr_db": 7.786369873632627,
+    "average_ms_ssim_db": 0.9393234083281528,
+    "average_elapsed_ms": 1344.1218376159668
+  }
+}

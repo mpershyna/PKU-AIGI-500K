@@ -86,3 +86,16 @@
 - 2026-05-05: Confirmed the latest commit tracked files under `checkpoints/`, including model checkpoint, TensorBoard event files, and stdout log files.
 - 2026-05-05: Removed `checkpoints/` from the git index with `git rm --cached -r checkpoints` so local checkpoint files remain on disk while the amended commit no longer tracks them.
 - 2026-05-05: Ensured `.gitignore` includes `checkpoints/` so the local checkpoint directory is not re-added to future commits.
+- 2026-05-05: User asked to evaluate the trained `lambda=0.05` MJ-only checkpoint at `checkpoints/mj_only_0_05/128_0.05/checkpoint_latest.pth.tar` on `data/MJ/test` and store per-image metrics in `results/mj_0_05_results.txt`.
+- 2026-05-05: Confirmed the MJ test split contains 1,000 images and `data/MJ/MJ.txt` contains 3,315 prompt records as read by Python.
+- 2026-05-05: Ran `code/eval.py` with CUDA on the MJ test split using the requested checkpoint and wrote stdout/stderr to `results/mj_0_05_results.txt`.
+- 2026-05-05: Verified `results/mj_0_05_results.txt` contains 1,000 per-image metric rows plus summary averages; the summary reports average PSNR 31.04 dB, average MS-SSIM 16.9571 dB, average bit-rate 0.4016 bpp, and average time 490.73 ms.
+- 2026-05-06: User asked for a Python script to recreate the paper-style MJ R-D plot from available lambda result files, skipping missing lambda datapoints.
+- 2026-05-06: Added `code/plot_mj_rd_curve.py`, which reads `results/mj_<lambda>_results.txt`, parses summary averages or recomputes averages from per-image rows, and plots bit-rate versus PSNR and bit-rate versus MS-SSIM.
+- 2026-05-06: Syntax-checked `code/plot_mj_rd_curve.py`.
+- 2026-05-06: Ran `code/plot_mj_rd_curve.py` on the current results; it loaded lambda values 0.0083, 0.015, and 0.05, skipped missing `results/mj_0_0275_results.txt`, and wrote `results/mj_rd_curve.png`.
+- 2026-05-06: User asked to amend the MJ R-D plotting script so the PSNR and MS-SSIM panels use the same y-axis limits as the original paper plot.
+- 2026-05-06: Patched `code/plot_mj_rd_curve.py` to set PSNR y-limits to 31.8-39.2 dB and MS-SSIM y-limits to 14.2-22.2 dB.
+- 2026-05-06: Syntax-checked `code/plot_mj_rd_curve.py` and regenerated `results/mj_rd_curve.png` with the updated y-axis limits.
+- 2026-05-06: User asked to lower the PSNR plot bottom limit because the current model values are lower than the paper values.
+- 2026-05-06: Patched `code/plot_mj_rd_curve.py` to use a PSNR y-axis range of 29.0-39.2 dB, syntax-checked the script, and regenerated `results/mj_rd_curve.png`.

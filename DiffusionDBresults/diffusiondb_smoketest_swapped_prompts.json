@@ -1,0 +1,40 @@
+[
+  {
+    "prompt_case": "swapped_prompts",
+    "local_id": 1,
+    "image_name": "0001.png",
+    "image_path": "C:\\Users\\masha\\OneDrive\\Documents\\Playground\\PKU-AIGI-500K\\tmp_diffusiondb_smoketest\\data\\images\\0001.png",
+    "source_image_name": "ee558f4b-5f42-445b-b100-07cc14aad514.png",
+    "part_id": 1,
+    "prompt": "of beautiful zoelea ixchel no ra, dancing eagle woman, smiling, goddess, mayan, 1 1 1 1, engulfed in funkadelic aura, surreal illustration, alphonse mucha, rhads, ross tran, artstation, artgerm, octane render, 1 6 k ",
+    "original_prompt": "predator from the movie predator doing entertainment for kids at a birthday party ",
+    "original_image_size": 448127,
+    "original_text_size": 82,
+    "prompt_text_size": 216,
+    "image_bitstream": 6164,
+    "compressed_size": 6380,
+    "bpp": 0.1947021484375,
+    "psnr_db": 5.658195831771524,
+    "ms_ssim_db": 0.7138382698759803,
+    "elapsed_ms": 790.9634113311768
+  },
+  {
+    "prompt_case": "swapped_prompts",
+    "local_id": 4,
+    "image_name": "0004.png",
+    "image_path": "C:\\Users\\masha\\OneDrive\\Documents\\Playground\\PKU-AIGI-500K\\tmp_diffusiondb_smoketest\\data\\images\\0004.png",
+    "source_image_name": "a15d5448-57b9-4717-9c92-31f87681bdc2.png",
+    "part_id": 1,
+    "prompt": "predator from the movie predator doing entertainment for kids at a birthday party ",
+    "original_prompt": "of beautiful zoelea ixchel no ra, dancing eagle woman, smiling, goddess, mayan, 1 1 1 1, engulfed in funkadelic aura, surreal illustration, alphonse mucha, rhads, ross tran, artstation, artgerm, octane render, 1 6 k ",
+    "original_image_size": 865332,
+    "original_text_size": 216,
+    "prompt_text_size": 82,
+    "image_bitstream": 9860,
+    "compressed_size": 9942,
+    "bpp": 0.18671123798076922,
+    "psnr_db": 4.8449351733552675,
+    "ms_ssim_db": 0.6599925107371283,
+    "elapsed_ms": 1162.2164249420166
+  }
+]

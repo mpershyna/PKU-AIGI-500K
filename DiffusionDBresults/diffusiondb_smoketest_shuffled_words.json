@@ -1,0 +1,40 @@
+[
+  {
+    "prompt_case": "shuffled_words",
+    "local_id": 1,
+    "image_name": "0001.png",
+    "image_path": "C:\\Users\\masha\\OneDrive\\Documents\\Playground\\PKU-AIGI-500K\\tmp_diffusiondb_smoketest\\data\\images\\0001.png",
+    "source_image_name": "ee558f4b-5f42-445b-b100-07cc14aad514.png",
+    "part_id": 1,
+    "prompt": "kids at a party entertainment birthday movie from doing for the predator predator",
+    "original_prompt": "predator from the movie predator doing entertainment for kids at a birthday party ",
+    "original_image_size": 448127,
+    "original_text_size": 82,
+    "prompt_text_size": 81,
+    "image_bitstream": 6112,
+    "compressed_size": 6193,
+    "bpp": 0.188995361328125,
+    "psnr_db": 5.572372906174797,
+    "ms_ssim_db": 0.7249022350072533,
+    "elapsed_ms": 680.8531284332275
+  },
+  {
+    "prompt_case": "shuffled_words",
+    "local_id": 4,
+    "image_name": "0004.png",
+    "image_path": "C:\\Users\\masha\\OneDrive\\Documents\\Playground\\PKU-AIGI-500K\\tmp_diffusiondb_smoketest\\data\\images\\0004.png",
+    "source_image_name": "a15d5448-57b9-4717-9c92-31f87681bdc2.png",
+    "part_id": 1,
+    "prompt": "alphonse k 1 dancing surreal mucha, in 1, woman, 1 zoelea aura, no illustration, beautiful 1 goddess, rhads, render, artgerm, engulfed ra, ross artstation, funkadelic ixchel octane of smiling, 6 1 mayan, eagle tran,",
+    "original_prompt": "of beautiful zoelea ixchel no ra, dancing eagle woman, smiling, goddess, mayan, 1 1 1 1, engulfed in funkadelic aura, surreal illustration, alphonse mucha, rhads, ross tran, artstation, artgerm, octane render, 1 6 k ",
+    "original_image_size": 865332,
+    "original_text_size": 216,
+    "prompt_text_size": 215,
+    "image_bitstream": 10048,
+    "compressed_size": 10263,
+    "bpp": 0.19273963341346154,
+    "psnr_db": 4.953061065111827,
+    "ms_ssim_db": 0.6735257235904877,
+    "elapsed_ms": 1035.5944633483887
+  }
+]
