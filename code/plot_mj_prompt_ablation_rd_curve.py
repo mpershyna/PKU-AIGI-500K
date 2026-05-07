@@ -204,7 +204,7 @@ def plot_curves(
     psnr_ylim = padded_limits([point.psnr for point in all_points], min_pad=0.03)
     ms_ssim_ylim = padded_limits([point.ms_ssim for point in all_points], min_pad=0.03)
 
-    fig, axes = plt.subplots(1, 2, figsize=(9.8, 4.1), constrained_layout=True)
+    fig, axes = plt.subplots(2, 1, figsize=(5.8, 7.8), constrained_layout=True)
     panels = [
         (axes[0], "psnr", "PSNR [dB]", psnr_ylim),
         (axes[1], "ms_ssim", "MS-SSIM [dB]", ms_ssim_ylim),

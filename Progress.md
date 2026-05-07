@@ -138,3 +138,5 @@
 - 2026-05-07: Generated `results/mj_prompt_ablation_rd_curve.png` from all 16 available datapoints across lambda values 0.0083, 0.015, 0.0275, and 0.05.
 - 2026-05-07: User asked to tighten the x-axis and y-axis ranges on the prompt-ablation R-D plot so they are just large enough to contain all datapoints.
 - 2026-05-07: Patched `code/plot_mj_prompt_ablation_rd_curve.py` to derive x-axis, PSNR y-axis, and MS-SSIM y-axis limits from the loaded datapoints with a small padding, then regenerated `results/mj_prompt_ablation_rd_curve.png`.
+- 2026-05-07: User asked to modify the prompt-ablation R-D plot so the PSNR and MS-SSIM plots are stacked vertically instead of shown side-by-side.
+- 2026-05-07: Updated `code/plot_mj_prompt_ablation_rd_curve.py` to use a 2-by-1 vertical subplot layout and regenerated `results/mj_prompt_ablation_rd_curve.png`.
