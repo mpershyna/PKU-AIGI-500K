@@ -1,0 +1,23 @@
+{
+  "image": "data/MJ/test/0001_4.png",
+  "checkpoint": "checkpoints/mj_only_0_05/128_0.05/checkpoint_latest.pth.tar",
+  "lambda_value": "0.05",
+  "prompt": "airplanes parked at an airport with a control tower in the background",
+  "width": 1024,
+  "height": 1024,
+  "num_pixels": 1048576,
+  "original_file_size_bytes": 1406033,
+  "bitstream_bytes": 45604,
+  "prompt_bytes": 69,
+  "compressed_payload_bytes": 45673,
+  "bitrate_bpp_including_prompt": 0.34845733642578125,
+  "bitrate_bpp_image_bitstream_only": 0.347930908203125,
+  "psnr_db": 31.897415575556582,
+  "ms_ssim": 0.9839472770690918,
+  "ms_ssim_db": 17.944512901396408,
+  "elapsed_ms": 662.6770496368408,
+  "reconstruction_path": "results/single_image/mj_lambda_0_05_0001_4_reconstruction.png",
+  "comparison_path": "results/single_image/mj_lambda_0_05_0001_4_comparison.png",
+  "compressed_payload_path": "results/single_image/mj_lambda_0_05_0001_4_compressed_payload.pt",
+  "metrics_path": "results/single_image/mj_lambda_0_05_0001_4_metrics.json"
+}

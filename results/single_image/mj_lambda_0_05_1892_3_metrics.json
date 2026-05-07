@@ -1,0 +1,23 @@
+{
+  "image": "data/MJ/test/1892_3.png",
+  "checkpoint": "checkpoints/mj_only_0_05/128_0.05/checkpoint_latest.pth.tar",
+  "lambda_value": "0.05",
+  "prompt": "there is a cow that is eating grass in the field",
+  "width": 1024,
+  "height": 1024,
+  "num_pixels": 1048576,
+  "original_file_size_bytes": 1644178,
+  "bitstream_bytes": 68868,
+  "prompt_bytes": 48,
+  "compressed_payload_bytes": 68916,
+  "bitrate_bpp_including_prompt": 0.525787353515625,
+  "bitrate_bpp_image_bitstream_only": 0.525421142578125,
+  "psnr_db": 32.35488144122757,
+  "ms_ssim": 0.9814027547836304,
+  "ms_ssim_db": 17.305513824452404,
+  "elapsed_ms": 661.4077091217041,
+  "reconstruction_path": "results/single_image/mj_lambda_0_05_1892_3_reconstruction.png",
+  "comparison_path": "results/single_image/mj_lambda_0_05_1892_3_comparison.png",
+  "compressed_payload_path": "results/single_image/mj_lambda_0_05_1892_3_compressed_payload.pt",
+  "metrics_path": "results/single_image/mj_lambda_0_05_1892_3_metrics.json"
+}

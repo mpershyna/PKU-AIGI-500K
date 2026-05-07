@@ -29,6 +29,16 @@ def compute_msssim(a: torch.Tensor, b: torch.Tensor) -> float:
     return -10.0 * math.log10(max(1.0 - score, 1e-10))
 
 
+def finish_and_exit(device: torch.device, force_exit: bool) -> None:
+    if device.type == "cuda":
+        torch.cuda.synchronize()
+        torch.cuda.empty_cache()
+    sys.stdout.flush()
+    sys.stderr.flush()
+    if force_exit:
+        os._exit(0)
+
+
 def pad(x: torch.Tensor, multiple: int):
     _, _, height, width = x.size()
     new_h = (height + multiple - 1) // multiple * multiple
@@ -116,6 +126,15 @@ def parse_args(argv):
     parser.add_argument("--text-dim", default=512, type=int)
     parser.add_argument("--num-slices", default=5, type=int)
     parser.add_argument("--pad-multiple", default=64, type=int)
+    parser.add_argument(
+        "--no-force-exit",
+        action="store_true",
+        help=(
+            "Return normally after evaluation instead of forcing process exit. "
+            "By default eval.py flushes output and exits immediately after summaries "
+            "to avoid hanging on lingering library threads."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -200,6 +219,7 @@ def main(argv) -> None:
     print(f"average_MS-SSIM: {total_ms_ssim / count:.4f}dB")
     print(f"average_Bit-rate: {total_bpp / count:.4f} bpp")
     print(f"average_time: {1000.0 * total_time / count:.2f} ms")
+    finish_and_exit(device, force_exit=not args.no_force_exit)
 
 
 if __name__ == "__main__":
