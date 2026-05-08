@@ -1,0 +1,56 @@
+MJ prompt-ablation significance report
+
+Difference convention: ablation - correct.
+For PSNR and MS-SSIM, negative values mean the ablation is worse.
+For bit-rate, positive values mean the ablation uses more bits.
+Curve-level rows average each image's paired difference across the available lambda values before testing.
+P-values use a paired sign-flip permutation test; confidence intervals are paired bootstrap intervals for the mean difference.
+Holm correction is applied across all reported tests with alpha=0.05. permutations=10000, bootstrap_samples=5000, seed=500000.
+
+case                   scope  lambda  metric             n   mean_diff      median                    95% CI          p     p_holm  sig
+-------------------------------------------------------------------------------------------------------------------------------------
+Empty prompts          curve  all     PSNR [dB]       1000   -0.025287   -0.020500 [ -0.027509,  -0.023158]  9.999e-05  0.0044996  yes
+Empty prompts          curve  all     MS-SSIM [dB]    1000   -0.031504   -0.024250 [ -0.034615,  -0.028446]  9.999e-05  0.0044996  yes
+Empty prompts          curve  all     Bit-rate [bpp]  1000    0.000013   -0.000175 [ -0.000078,   0.000106]    0.78622    0.78622   no
+Empty prompts          lambda 0.0083  PSNR [dB]       1000   -0.025639   -0.021500 [ -0.028190,  -0.023130]  9.999e-05  0.0044996  yes
+Empty prompts          lambda 0.0083  MS-SSIM [dB]    1000   -0.032966   -0.027000 [ -0.036487,  -0.029490]  9.999e-05  0.0044996  yes
+Empty prompts          lambda 0.0083  Bit-rate [bpp]  1000   -0.000347   -0.000600 [ -0.000439,  -0.000244]  9.999e-05  0.0044996  yes
+Empty prompts          lambda 0.015   PSNR [dB]       1000   -0.025819   -0.020000 [ -0.028375,  -0.023342]  9.999e-05  0.0044996  yes
+Empty prompts          lambda 0.015   MS-SSIM [dB]    1000   -0.031655   -0.023000 [ -0.035240,  -0.027996]  9.999e-05  0.0044996  yes
+Empty prompts          lambda 0.015   Bit-rate [bpp]  1000    0.000125   -0.000100 [  0.000019,   0.000242]   0.026097   0.052195   no
+Empty prompts          lambda 0.0275  PSNR [dB]       1000   -0.026513   -0.020000 [ -0.029012,  -0.024025]  9.999e-05  0.0044996  yes
+Empty prompts          lambda 0.0275  MS-SSIM [dB]    1000   -0.035780   -0.025000 [ -0.039799,  -0.032045]  9.999e-05  0.0044996  yes
+Empty prompts          lambda 0.0275  Bit-rate [bpp]  1000   -0.000142   -0.000200 [ -0.000232,  -0.000051]  0.0016998  0.0050995  yes
+Empty prompts          lambda 0.05    PSNR [dB]       1000   -0.023177   -0.018000 [ -0.025713,  -0.020699]  9.999e-05  0.0044996  yes
+Empty prompts          lambda 0.05    MS-SSIM [dB]    1000   -0.025615   -0.019000 [ -0.028472,  -0.022688]  9.999e-05  0.0044996  yes
+Empty prompts          lambda 0.05    Bit-rate [bpp]  1000    0.000417    0.000200 [  0.000288,   0.000550]  9.999e-05  0.0044996  yes
+Word-shuffled prompts  curve  all     PSNR [dB]       1000   -0.005278   -0.003375 [ -0.006252,  -0.004320]  9.999e-05  0.0044996  yes
+Word-shuffled prompts  curve  all     MS-SSIM [dB]    1000   -0.005260   -0.004500 [ -0.006460,  -0.004044]  9.999e-05  0.0044996  yes
+Word-shuffled prompts  curve  all     Bit-rate [bpp]  1000    0.000286    0.000250 [  0.000255,   0.000318]  9.999e-05  0.0044996  yes
+Word-shuffled prompts  lambda 0.0083  PSNR [dB]       1000   -0.006900   -0.004000 [ -0.008460,  -0.005395]  9.999e-05  0.0044996  yes
+Word-shuffled prompts  lambda 0.0083  MS-SSIM [dB]    1000   -0.005952   -0.005000 [ -0.007584,  -0.004301]  9.999e-05  0.0044996  yes
+Word-shuffled prompts  lambda 0.0083  Bit-rate [bpp]  1000    0.000187    0.000200 [  0.000155,   0.000220]  9.999e-05  0.0044996  yes
+Word-shuffled prompts  lambda 0.015   PSNR [dB]       1000   -0.005341   -0.003000 [ -0.006797,  -0.004037]  9.999e-05  0.0044996  yes
+Word-shuffled prompts  lambda 0.015   MS-SSIM [dB]    1000   -0.005217   -0.004000 [ -0.006690,  -0.003697]  9.999e-05  0.0044996  yes
+Word-shuffled prompts  lambda 0.015   Bit-rate [bpp]  1000    0.000259    0.000200 [  0.000220,   0.000299]  9.999e-05  0.0044996  yes
+Word-shuffled prompts  lambda 0.0275  PSNR [dB]       1000   -0.004555   -0.003000 [ -0.005593,  -0.003545]  9.999e-05  0.0044996  yes
+Word-shuffled prompts  lambda 0.0275  MS-SSIM [dB]    1000   -0.005514   -0.005000 [ -0.006984,  -0.004095]  9.999e-05  0.0044996  yes
+Word-shuffled prompts  lambda 0.0275  Bit-rate [bpp]  1000    0.000197    0.000200 [  0.000161,   0.000235]  9.999e-05  0.0044996  yes
+Word-shuffled prompts  lambda 0.05    PSNR [dB]       1000   -0.004318   -0.003000 [ -0.005293,  -0.003356]  9.999e-05  0.0044996  yes
+Word-shuffled prompts  lambda 0.05    MS-SSIM [dB]    1000   -0.004357   -0.003000 [ -0.005740,  -0.002985]  9.999e-05  0.0044996  yes
+Word-shuffled prompts  lambda 0.05    Bit-rate [bpp]  1000    0.000501    0.000500 [  0.000451,   0.000553]  9.999e-05  0.0044996  yes
+Swapped prompts        curve  all     PSNR [dB]       1000   -0.027761   -0.017500 [ -0.030820,  -0.024817]  9.999e-05  0.0044996  yes
+Swapped prompts        curve  all     MS-SSIM [dB]    1000   -0.039544   -0.024750 [ -0.043806,  -0.035508]  9.999e-05  0.0044996  yes
+Swapped prompts        curve  all     Bit-rate [bpp]  1000    0.000994    0.000700 [  0.000881,   0.001110]  9.999e-05  0.0044996  yes
+Swapped prompts        lambda 0.0083  PSNR [dB]       1000   -0.031398   -0.020000 [ -0.035202,  -0.027754]  9.999e-05  0.0044996  yes
+Swapped prompts        lambda 0.0083  MS-SSIM [dB]    1000   -0.039621   -0.028000 [ -0.044141,  -0.035138]  9.999e-05  0.0044996  yes
+Swapped prompts        lambda 0.0083  Bit-rate [bpp]  1000    0.000947    0.000600 [  0.000835,   0.001063]  9.999e-05  0.0044996  yes
+Swapped prompts        lambda 0.015   PSNR [dB]       1000   -0.027940   -0.017000 [ -0.031118,  -0.024801]  9.999e-05  0.0044996  yes
+Swapped prompts        lambda 0.015   MS-SSIM [dB]    1000   -0.043114   -0.027000 [ -0.047845,  -0.038546]  9.999e-05  0.0044996  yes
+Swapped prompts        lambda 0.015   Bit-rate [bpp]  1000    0.001078    0.000700 [  0.000937,   0.001229]  9.999e-05  0.0044996  yes
+Swapped prompts        lambda 0.0275  PSNR [dB]       1000   -0.026987   -0.017000 [ -0.030064,  -0.024035]  9.999e-05  0.0044996  yes
+Swapped prompts        lambda 0.0275  MS-SSIM [dB]    1000   -0.040981   -0.026000 [ -0.045654,  -0.036388]  9.999e-05  0.0044996  yes
+Swapped prompts        lambda 0.0275  Bit-rate [bpp]  1000    0.000986    0.000750 [  0.000872,   0.001098]  9.999e-05  0.0044996  yes
+Swapped prompts        lambda 0.05    PSNR [dB]       1000   -0.024720   -0.015000 [ -0.027939,  -0.021739]  9.999e-05  0.0044996  yes
+Swapped prompts        lambda 0.05    MS-SSIM [dB]    1000   -0.034462   -0.022000 [ -0.038590,  -0.030441]  9.999e-05  0.0044996  yes
+Swapped prompts        lambda 0.05    Bit-rate [bpp]  1000    0.000964    0.000600 [  0.000811,   0.001125]  9.999e-05  0.0044996  yes
