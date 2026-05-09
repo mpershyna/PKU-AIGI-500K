@@ -1,105 +1,119 @@
-# <center> PKU-AIGI-500K
-**DCC2024: Xunxu Duan, Hongbin Liu, Li Zhang, [Chuanmin Jia](http://www.jiachuanmin.site/index.html)**
+# PKU-AIGI-500K CATC Compression Project
 
-**JETCAS 2024: Xunxu Duan, Siwei Ma, Hongbin Liu, [Chuanmin Jia](http://www.jiachuanmin.site/index.html)**
+This repository contains a reconstructed CATC compression model for AI-generated
+images, along with training, evaluation, and plotting
+utilities.
 
-[Project Page](https://duanener.github.io/PKU-AIGI-500K/) | [Paper 1](https://ieeexplore.ieee.org/abstract/document/10533760) | [Paper 2](https://ieeexplore.ieee.org/document/10493034)
+## Requirements
 
-:hammer:This repository is the official repository of the PKU-AIGI-500K benchmark.
+The Python dependencies are listed in:
 
-:smiley:If this project helps you, please fork, watch, and give a star to this repository.
-
-<!-- # Dataset -->
-
-![example](./static/images/example.jpg) 
-
-
-![why](./static/images/why.png) 
-
-## Statistics
-|            |      Train    |  Validation  |    Test     |   Size  |
-|:----------:|:-------------:|:------------:|:-----------:|:-----------:|
-|   SD2.1B   |**202,265**(512 $\times$ 512)|**40**(512 $\times$ 512)|**40**(768 $\times$ 768)|[~82G](https://huggingface.co/datasets/Forerunner/PKU-AIGI-500K)|
-|   SD2.1    |**203,242**(768 $\times$ 768)|**40**(768 $\times$ 768)|**40**(1024 $\times$ 1024)|~189G|
-|  SDXL1.0B  |**105,554**(1024 $\times$ 1024)|**20**(1024 $\times$ 1024)|**40** $\times$ **2**(1280 $\times$ 1280)|~158G|
-|   MJ5.2    |**13,240**(1024 $\times$ 1024)|**10**(1024 $\times$ 1024)|**25**(2048 $\times$ 1024)|~20G|
-|    MOD     |**3,670**(1408 $\times$ 640)|**5**(1408 $\times$ 640)|**25**(2112 $\times$ 960)|~5.5G|
-
-**Total**: 105k+ texts, 528k+ images, ~455G.
-
-## Local Implementation Notes
-The public release currently omits the actual compression model implementation.
-This workspace adds a reconstruction of the paper's CATC codec under
-[`code/model`](./code/model), including:
-
-- the Cross-Attention Transformer Codec main path
-- the ConvGRU-based Cross-Attention Channel-wise entropy model
-- training and evaluation entry points that match the released repository API
-
-The implementation is grounded in the paper figures and equations, with the
-channel-wise entropy path shaped after the MIT-licensed LIC_TCM reference code
-that the paper explicitly builds on.
-
-## Setup
-Install the Python dependencies from [`code/requirements.txt`](./code/requirements.txt).
-
-Example training command:
-
-```bash
-python code/train.py -d /path/to/PKU-AIGI-500K --save-path /path/to/checkpoints --cuda
+```powershell
+code\requirements.txt
 ```
 
-Example evaluation command:
+The current requirements are:
 
-```bash
-python code/eval.py --checkpoint /path/to/checkpoint.pth.tar --data-i /path/to/images --data-t /path/to/prompts.txt --cuda
+```text
+torch
+torchvision
+compressai>=1.2
+pytorch-msssim
+Pillow
+numpy
+tensorboard
+matplotlib
+remotezip
+git+https://github.com/openai/CLIP.git
 ```
 
-## DiffusionDB Prompt Ablation
-For a small local prompt-ablation experiment, you can sample a limited
-number of image/prompt pairs directly from the official DiffusionDB remote
-shard zips, train one small checkpoint on correct pairs, and then evaluate
-the same checkpoint under multiple prompt conditions (`correct`, `empty`,
-`shuffled_words`, and `swapped_prompts`) with:
+## Install
 
-```bash
-python code/run_diffusiondb_prompt_ablation.py --cuda
+From the repository root:
+
+```powershell
+cd "C:\Users\masha\OneDrive\Documents\Playground\PKU-AIGI-500K"
 ```
 
-By default this script:
+Create and activate a virtual environment:
 
-- downloads 50 DiffusionDB pairs into `diffusiondb_prompt_ablation/data`
-- uses 40 pairs for training and 10 held-out pairs for evaluation
-- trains a small local checkpoint under `diffusiondb_prompt_ablation/checkpoints`
-- writes JSON arrays for each prompt case into `results/`
-
-The main knobs for scaling later are `--sample-count`, `--part-ids`,
-`--epochs`, and the channel-size arguments.
-
-To plot the compression ratio `compressed_size / initial_size` by prompt case,
-run:
-
-```bash
-python code/plot_prompt_ablation_results.py
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 ```
 
-Here `initial_size` is the original image size plus the original prompt-text
-size. The script reads the JSON arrays in `results/` and writes a PNG such as
-`results/diffusiondb_prompt_ablation_compression_ratio_by_case.png`.
+Upgrade `pip`:
 
-
-# Citation
-:smiley:If you find our repository useful for your research, please consider citing our paper:
-
+```powershell
+python -m pip install --upgrade pip
 ```
-@ARTICLE{10493034,
-  author={Duan, Xunxu and Ma, Siwei and Liu, Hongbin and Jia, Chuanmin},
-  journal={IEEE Journal on Emerging and Selected Topics in Circuits and Systems}, 
-  title={PKU-AIGI-500K: A Neural Compression Benchmark And Model for AI-Generated Images}, 
-  year={2024},
-  volume={},
-  number={},
-  pages={1-1},
-  keywords={Image coding;Codecs;Circuits and systems;Measurement;Image synthesis;Image quality;Integrated circuit modeling;Image Compression;AIGI;image Feature;text-to-image alignment and subjective evaluation},
-  doi={10.1109/JETCAS.2024.3385629}}
+
+Install the project requirements:
+
+```powershell
+python -m pip install -r code\requirements.txt
 ```
+
+If PyTorch/CUDA installation fails or installs the wrong CUDA build, install
+`torch` and `torchvision` using the command recommended by the official PyTorch
+installer for your GPU/CUDA version, then rerun:
+
+```powershell
+python -m pip install -r code\requirements.txt
+```
+
+## Sample Training Command
+
+Download the PKU-AIGI-500K dataset from https://huggingface.co/datasets/Forerunner/PKU-AIGI-500K, then put the data paths in the command below. This example trains on the `MJ` subset and writes checkpoints to the path you
+provide with `--save-path`.
+
+```powershell
+python code\train.py `
+  -d "C:\path\to\PKU-AIGI-500K" `
+  --save-path "C:\path\to\checkpoints" `
+  --log-file "checkpoints\stdout_log.txt" `
+  --training-mode step `
+  --max-steps 20000 `
+  --datasets MJ `
+  --batch-size 10 `
+  --test-batch-size 10 `
+  --lambda 0.05 `
+  --patch-size 256 256 `
+  --metric mse `
+  --lr-step 16000 18500 `
+  --log-interval-steps 100 `
+  --validation-interval-steps 100 `
+  --checkpoint-interval-steps 100 `
+  --cuda
+```
+
+Replace `C:\path\to\PKU-AIGI-500K` with the dataset root that contains the `MJ`
+folder. The training script expects the MJ data to be arranged like this:
+
+```text
+C:\path\to\PKU-AIGI-500K\MJ\train
+C:\path\to\PKU-AIGI-500K\MJ\val
+C:\path\to\PKU-AIGI-500K\MJ\train.txt
+C:\path\to\PKU-AIGI-500K\MJ\vaild.txt
+```
+
+The validation folder may also be named `valid` or `vaild`, and the validation
+prompt file may be named `valid.txt`, `val.txt`, `vaild.txt`, or `MJ.txt`.
+
+## Sample Evaluation Command
+
+Use `eval.py` to evaluate a trained checkpoint on a test image folder and its
+matching prompt file. The lambda value is not passed directly to `eval.py`;
+instead, choose the checkpoint saved under the folder for the lambda used during
+training. 
+
+```powershell
+python code\eval.py `
+  --checkpoint "C:\path\to\checkpoints\128_0.05\checkpoint_latest.pth.tar" `
+  --data-i "C:\path\to\PKU-AIGI-500K\MJ\test" `
+  --data-t "C:\path\to\PKU-AIGI-500K\MJ\test.txt" `
+  --cuda
+```
+
+Replace `0.05` in the checkpoint path with the lambda value you trained with.
+
