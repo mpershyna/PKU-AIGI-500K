@@ -4,6 +4,22 @@ This repository contains a reconstructed CATC compression model for AI-generated
 images, along with training, evaluation, and plotting
 utilities.
 
+## Basic info
+
+Title: An exploration of prompt text utility in AI-generated image compression
+
+Author: Mariya Pershyna
+
+Abstract: Due to the massive increase in AI-generated data in recent
+years, storage and transmission of AI-generated images is a
+more pressing problem. One solution is image compression
+that is specific to AI-generated images. This project reconstructs CATC, an image compression model for AI-generated
+images, and performs a prompt ablation study to understand to
+what extent prompt information improves AIGI compression.
+The findings are that altering the prompt does reduce image
+compression quality by a statistically significant amount, but
+this reduction is incredibly small (less than 0.1 dB).
+
 ## Requirements
 
 The Python dependencies are listed in:
